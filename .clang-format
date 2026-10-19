@@ -1,0 +1,19 @@
+# Mechanical C formatting for the kernel sources.
+#
+# Use through `make format` or verify without edits with `make check-format`.
+
+BasedOnStyle: LLVM
+# clang-format's Standard option names C++ grammar revisions even for .c files;
+# language semantics remain controlled by the Makefile's -std=c11 flag.
+Standard: Latest
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+PointerAlignment: Right
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve

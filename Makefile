@@ -37,7 +37,9 @@ LDFLAGS := \
 	-Wl,--gc-sections -Wl,-z,max-page-size=0x1000 \
 	-Wl,-z,noexecstack -Wl,--build-id=none -Wl,--fatal-warnings
 
-.PHONY: all run debug clean check-tools
+FORMAT_FILES := kernel/main.c
+
+.PHONY: all run debug lsp format check-format clean check-tools
 all: $(BUILD_DIR)/vandal-os.iso
 
 run: all
@@ -45,6 +47,14 @@ run: all
 
 debug: all
 	./scripts/run-qemu.sh --debug
+
+lsp: $(BUILD_DIR)/compile_commands.json
+
+format:
+	clang-format -i $(FORMAT_FILES)
+
+check-format:
+	clang-format --dry-run --Werror $(FORMAT_FILES)
 
 check-tools:
 	@command -v $(CC) >/dev/null || { echo "error: clang is required" >&2; exit 1; }
@@ -56,6 +66,12 @@ check-tools:
 $(BUILD_DIR)/kernel/main.o: kernel/main.c Makefile $(LIMINE_HEADER) | check-tools
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD_DIR)/compile_commands.json: kernel/main.c Makefile $(LIMINE_HEADER) | check-tools
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MJ $@.tmp -fsyntax-only kernel/main.c
+	@{ printf '[\n'; sed '$$s/,$$//' $@.tmp; printf ']\n'; } >$@
+	@rm -f $@.tmp
 
 $(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/kernel/main.o kernel/linker.ld Makefile
 	$(CC) $(CFLAGS) $(LDFLAGS) $(BUILD_DIR)/kernel/main.o -o $@

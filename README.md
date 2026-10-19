@@ -1,31 +1,65 @@
 # Vandal OS
 
-Vandal OS is a small 32-bit RISC-V kernel.
+Vandal OS is a small educational x86-64 kernel written in C. It boots with
+Limine and runs on a single CPU in QEMU.
 
-## What works
+## Current state
 
-- The linker loads the kernel at `0x80200000`.
-- The boot code sets the stack pointer and enters `kernel_main`.
-- The kernel clears the BSS section and stays in an idle loop.
-- `run.sh` builds the kernel with Clang and LLD, then starts it in QEMU.
+The kernel currently:
 
-## Run
+- builds as a freestanding ELF file with Clang and LLD;
+- boots from a Limine ISO;
+- stops in a `cli; hlt` loop.
+
+Memory management, interrupts, processes, and user space are not implemented
+yet. The initial stack and page tables are provided by Limine.
+
+## Tools
+
+- Clang and LLD compile and link the kernel.
+- GNU Make manages the build.
+- Limine loads the kernel.
+- xorriso creates the bootable ISO.
+- QEMU runs the kernel.
+- GDB supports debugging.
+
+The build also uses curl, sha256sum, and tar to download and verify the pinned
+Limine files.
+
+## Build and run
+
+Install the tools above, including `qemu-system-x86_64`, then run:
 
 ```sh
-./run.sh
+make
+./scripts/run-qemu.sh
 ```
 
-The blank screen after OpenSBI is expected because the kernel does not print
-anything yet. Press `Ctrl+A`, then `X`, to close QEMU.
+The first build downloads the pinned Limine release and protocol header, then
+verifies their SHA-256 hashes.
 
-## Tools used
+Useful commands:
 
-- C11
-- Clang and LLD
-- QEMU `virt` for 32-bit RISC-V
-- OpenSBI
-- Jujutsu
+```sh
+./scripts/run-qemu.sh --debug  # Start QEMU paused for GDB
+make clean        # Remove generated files
+```
 
-## Reference
+## Project files
 
-- [OS in 1,000 Lines](https://operating-system-in-1000-lines.vercel.app/)
+- `kernel/main.c` contains the kernel entry point and halt loop.
+- `kernel/linker.ld` defines the ELF memory layout.
+- `boot/limine.conf` contains the bootloader configuration.
+- `Makefile` builds the kernel and bootable ISO.
+- `scripts/run-qemu.sh` starts the kernel in QEMU.
+
+## References
+
+- [Limine boot protocol](https://github.com/limine-bootloader/limine-protocol)
+- [Limine C template](https://github.com/limine-bootloader/limine-c-template)
+- [Operating System in 1,000 Lines](https://1000os.seiya.me/)
+
+## License
+
+No license has been selected yet. Until a license is added, the source code is
+not granted for reuse or redistribution.

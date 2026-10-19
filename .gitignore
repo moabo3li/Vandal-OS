@@ -1,2 +1,4 @@
 /kernel.elf
 /kernel.map
+/build/
+/build-negative/

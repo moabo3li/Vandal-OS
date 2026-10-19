@@ -61,5 +61,4 @@ make clean        # Remove generated files
 
 ## License
 
-No license has been selected yet. Until a license is added, the source code is
-not granted for reuse or redistribution.
+Vandal OS is available under the [MIT License](LICENSE).

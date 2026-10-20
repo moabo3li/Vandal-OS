@@ -37,7 +37,9 @@ LDFLAGS := \
 	-Wl,--gc-sections -Wl,-z,max-page-size=0x1000 \
 	-Wl,-z,noexecstack -Wl,--build-id=none -Wl,--fatal-warnings
 
-FORMAT_FILES := kernel/main.c
+KERNEL_SOURCES := kernel/main.c kernel/serial.c
+KERNEL_OBJECTS := $(KERNEL_SOURCES:kernel/%.c=$(BUILD_DIR)/kernel/%.o)
+FORMAT_FILES := $(KERNEL_SOURCES) kernel/serial.h kernel/arch/x86_64/io.h
 
 .PHONY: all run debug lsp format check-format clean check-tools
 all: $(BUILD_DIR)/vandal-os.iso
@@ -63,18 +65,19 @@ check-tools:
 	@command -v sha256sum >/dev/null || { echo "error: sha256sum is required" >&2; exit 1; }
 	@command -v tar >/dev/null || { echo "error: tar is required" >&2; exit 1; }
 
-$(BUILD_DIR)/kernel/main.o: kernel/main.c Makefile $(LIMINE_HEADER) | check-tools
+$(BUILD_DIR)/kernel/%.o: kernel/%.c Makefile $(LIMINE_HEADER) | check-tools
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c $< -o $@
 
-$(BUILD_DIR)/compile_commands.json: kernel/main.c Makefile $(LIMINE_HEADER) | check-tools
+$(BUILD_DIR)/compile_commands.json: $(KERNEL_SOURCES) Makefile $(LIMINE_HEADER) | check-tools
 	@mkdir -p $(@D)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -MJ $@.tmp -fsyntax-only kernel/main.c
-	@{ printf '[\n'; sed '$$s/,$$//' $@.tmp; printf ']\n'; } >$@
-	@rm -f $@.tmp
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MJ $@.main.tmp -fsyntax-only kernel/main.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MJ $@.serial.tmp -fsyntax-only kernel/serial.c
+	@{ printf '[\n'; sed -n 'p' $@.main.tmp; sed '$$s/,$$//' $@.serial.tmp; printf ']\n'; } >$@
+	@rm -f $@.main.tmp $@.serial.tmp
 
-$(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/kernel/main.o kernel/linker.ld Makefile
-	$(CC) $(CFLAGS) $(LDFLAGS) $(BUILD_DIR)/kernel/main.o -o $@
+$(BUILD_DIR)/kernel.elf: $(KERNEL_OBJECTS) kernel/linker.ld Makefile
+	$(CC) $(CFLAGS) $(LDFLAGS) $(KERNEL_OBJECTS) -o $@
 
 $(BUILD_DIR)/vandal-os.iso: $(BUILD_DIR)/kernel.elf boot/limine.conf $(LIMINE_TOOL) | check-tools
 	@rm -rf $(ISO_ROOT)
@@ -114,4 +117,4 @@ $(LIMINE_HEADER): | check-tools
 clean:
 	rm -rf build
 
--include $(BUILD_DIR)/kernel/main.d
+-include $(KERNEL_OBJECTS:.o=.d)

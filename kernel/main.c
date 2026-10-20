@@ -3,6 +3,8 @@
 
 #include <limine.h>
 
+#include "serial.h"
+
 _Static_assert(sizeof(size_t) == 8, "x86-64 size_t must be 64 bits");
 _Static_assert(sizeof(uintptr_t) == 8, "x86-64 pointers must be 64 bits");
 
@@ -36,6 +38,10 @@ __attribute__((noreturn, noinline)) void kernel_idle(void) {
 __attribute__((noreturn)) void kernel_main(void) {
     /* Keep these entry requirements explicit while no IDT exists. */
     __asm__ volatile("cli\ncld" ::: "memory");
+
+    if (serial_init()) {
+        (void)serial_puts("Vandal-OS: serial ready\r\n");
+    }
 
     kernel_idle();
 }

@@ -1,7 +1,15 @@
 #include "serial.h"
-#include "arch/x86_64/io.h"
 #include <stddef.h>
 #include <stdint.h>
+
+#if defined(VANDAL_SERIAL_TEST)
+void serial_test_outb(uint16_t port, uint8_t value);
+uint8_t serial_test_inb(uint16_t port);
+#define outb serial_test_outb
+#define inb serial_test_inb
+#else
+#include "arch/x86_64/io.h"
+#endif
 
 /* ISA I/O-port base for the first 16550-compatible serial device. */
 #define COM1_BASE_PORT UINT16_C(0x03f8)

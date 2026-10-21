@@ -39,9 +39,11 @@ LDFLAGS := \
 
 KERNEL_SOURCES := kernel/main.c kernel/serial.c
 KERNEL_OBJECTS := $(KERNEL_SOURCES:kernel/%.c=$(BUILD_DIR)/kernel/%.o)
-FORMAT_FILES := $(KERNEL_SOURCES) kernel/serial.h kernel/arch/x86_64/io.h
+FORMAT_FILES := $(KERNEL_SOURCES) kernel/serial.h kernel/arch/x86_64/io.h tests/serial_test.c
+SERIAL_TEST_BINARY := $(BUILD_DIR)/tests/serial-test
+SERIAL_TEST_SOURCES := tests/serial_test.c kernel/serial.c
 
-.PHONY: all run debug lsp format check-format clean check-tools
+.PHONY: all run debug test test-serial lsp format check-format clean check-tools
 all: $(BUILD_DIR)/vandal-os.iso
 
 run: all
@@ -49,6 +51,11 @@ run: all
 
 debug: all
 	./scripts/run-qemu.sh --debug
+
+test: test-serial
+
+test-serial: $(SERIAL_TEST_BINARY)
+	./$(SERIAL_TEST_BINARY)
 
 lsp: $(BUILD_DIR)/compile_commands.json
 
@@ -68,6 +75,11 @@ check-tools:
 $(BUILD_DIR)/kernel/%.o: kernel/%.c Makefile $(LIMINE_HEADER) | check-tools
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c $< -o $@
+
+$(SERIAL_TEST_BINARY): $(SERIAL_TEST_SOURCES) kernel/serial.h Makefile
+	@mkdir -p $(@D)
+	$(CC) -std=c11 -O2 -g3 -Wall -Wextra -Wpedantic -Werror \
+		-DVANDAL_SERIAL_TEST -Ikernel $(SERIAL_TEST_SOURCES) -o $@
 
 $(BUILD_DIR)/compile_commands.json: $(KERNEL_SOURCES) Makefile $(LIMINE_HEADER) | check-tools
 	@mkdir -p $(@D)

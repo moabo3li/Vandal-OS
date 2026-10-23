@@ -37,13 +37,13 @@ LDFLAGS := \
 	-Wl,--gc-sections -Wl,-z,max-page-size=0x1000 \
 	-Wl,-z,noexecstack -Wl,--build-id=none -Wl,--fatal-warnings
 
-KERNEL_SOURCES := kernel/main.c kernel/serial.c
+KERNEL_SOURCES := kernel/main.c kernel/serial.c kernel/arch/guest_result.c
 KERNEL_OBJECTS := $(KERNEL_SOURCES:kernel/%.c=$(BUILD_DIR)/kernel/%.o)
-FORMAT_FILES := $(KERNEL_SOURCES) kernel/serial.h kernel/arch/x86_64/io.h tests/serial_test.c
+FORMAT_FILES := $(KERNEL_SOURCES) kernel/serial.h kernel/arch/x86_64/io.h kernel/guest_result.h tests/serial_test.c
 SERIAL_TEST_BINARY := $(BUILD_DIR)/tests/serial-test
 SERIAL_TEST_SOURCES := tests/serial_test.c kernel/serial.c
 
-.PHONY: all run debug test test-serial lsp format check-format clean check-tools
+.PHONY: all run debug test test-serial test-guest-result lsp format check-format clean check-tools
 all: $(BUILD_DIR)/vandal-os.iso
 
 run: all
@@ -56,6 +56,10 @@ test: test-serial
 
 test-serial: $(SERIAL_TEST_BINARY)
 	./$(SERIAL_TEST_BINARY)
+
+test-guest-result: all
+	./scripts/test-guest-result.sh direct-result
+	./scripts/test-guest-result.sh serial-absent
 
 lsp: $(BUILD_DIR)/compile_commands.json
 
@@ -85,8 +89,9 @@ $(BUILD_DIR)/compile_commands.json: $(KERNEL_SOURCES) Makefile $(LIMINE_HEADER) 
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -MJ $@.main.tmp -fsyntax-only kernel/main.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -MJ $@.serial.tmp -fsyntax-only kernel/serial.c
-	@{ printf '[\n'; sed -n 'p' $@.main.tmp; sed '$$s/,$$//' $@.serial.tmp; printf ']\n'; } >$@
-	@rm -f $@.main.tmp $@.serial.tmp
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MJ $@.guest-result.tmp -fsyntax-only kernel/arch/guest_result.c
+	@{ printf '[\n'; sed -n 'p' $@.main.tmp; sed -n 'p' $@.serial.tmp; sed '$$s/,$$//' $@.guest-result.tmp; printf ']\n'; } >$@
+	@rm -f $@.main.tmp $@.serial.tmp $@.guest-result.tmp
 
 $(BUILD_DIR)/kernel.elf: $(KERNEL_OBJECTS) kernel/linker.ld Makefile
 	$(CC) $(CFLAGS) $(LDFLAGS) $(KERNEL_OBJECTS) -o $@

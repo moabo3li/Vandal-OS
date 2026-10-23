@@ -3,6 +3,7 @@
 
 #include <limine.h>
 
+#include "guest_result.h"
 #include "serial.h"
 
 _Static_assert(sizeof(size_t) == 8, "x86-64 size_t must be 64 bits");
@@ -39,9 +40,15 @@ __attribute__((noreturn)) void kernel_main(void) {
     /* Keep these entry requirements explicit while no IDT exists. */
     __asm__ volatile("cli\ncld" ::: "memory");
 
-    if (serial_init()) {
-        (void)serial_puts("Vandal-OS: serial ready\r\n");
+#if defined(VANDAL_TEST_GUEST_RESULT)
+    guest_result_report(GUEST_RESULT_TEST_OK);
+#endif
+
+    if (!serial_init()) {
+        guest_result_report(GUEST_RESULT_SERIAL_UNAVAILABLE);
     }
+
+    (void)serial_puts("Vandal-OS: serial ready\r\n");
 
     kernel_idle();
 }

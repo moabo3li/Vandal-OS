@@ -79,6 +79,10 @@ __attribute__((noreturn)) void kernel_main(void) {
 
     validate_limine_handoff();
 
+#if defined(VANDAL_TEST_GUEST_RESULT)
+    guest_result_report(GUEST_RESULT_TEST_OK);
+#endif
+
     bool serial_ready = serial_init();
 
 #if defined(VANDAL_TEST_PANIC)

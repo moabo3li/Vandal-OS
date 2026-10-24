@@ -11,6 +11,10 @@ typedef enum guest_result {
     GUEST_RESULT_UNEXPECTED_PANIC = 0x16,
 } guest_result;
 
+/* QEMU converts this value to an 8-bit process status with (value << 1) | 1. */
+_Static_assert(GUEST_RESULT_UNEXPECTED_PANIC <= 0x7f,
+               "guest results must remain distinguishable as process statuses");
+
 /* Report one test result to QEMU, then halt if the device is unavailable. */
 __attribute__((noreturn)) void guest_result_report(guest_result result);
 

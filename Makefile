@@ -43,7 +43,7 @@ FORMAT_FILES := $(KERNEL_SOURCES) kernel/serial.h kernel/arch/x86_64/io.h kernel
 SERIAL_TEST_BINARY := $(BUILD_DIR)/tests/serial-test
 SERIAL_TEST_SOURCES := tests/serial_test.c kernel/serial.c
 
-.PHONY: all run debug test test-serial test-guest-result test-panic lsp format check-format clean check-tools
+.PHONY: all run debug test test-serial test-guest-result test-panic test-limine-handoff lsp format check-format clean check-tools
 all: $(BUILD_DIR)/vandal-os.iso
 
 run: all
@@ -64,6 +64,11 @@ test-guest-result: all
 test-panic:
 	./scripts/test-guest-result.sh expected-panic
 	./scripts/test-guest-result.sh expected-panic-serial-absent
+
+test-limine-handoff:
+	./scripts/test-guest-result.sh bad-revision
+	./scripts/test-guest-result.sh bad-data
+	./scripts/test-guest-result.sh bad-bss
 
 lsp: $(BUILD_DIR)/compile_commands.json
 

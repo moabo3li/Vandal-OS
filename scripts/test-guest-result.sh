@@ -30,8 +30,26 @@ case "$mode" in
     build_args=(BUILD_DIR="$build_dir" EXTRA_CFLAGS=-DVANDAL_TEST_PANIC)
     serial_backend=none
     ;;
+  bad-revision)
+    build_dir="build/test-bad-revision"
+    expected_status=39
+    build_args=(BUILD_DIR="$build_dir" EXTRA_CFLAGS=-DVANDAL_TEST_BAD_LIMINE_REVISION)
+    serial_backend=none
+    ;;
+  bad-data)
+    build_dir="build/test-bad-data"
+    expected_status=41
+    build_args=(BUILD_DIR="$build_dir" EXTRA_CFLAGS=-DVANDAL_TEST_BAD_DATA)
+    serial_backend=none
+    ;;
+  bad-bss)
+    build_dir="build/test-bad-bss"
+    expected_status=43
+    build_args=(BUILD_DIR="$build_dir" EXTRA_CFLAGS=-DVANDAL_TEST_BAD_BSS)
+    serial_backend=none
+    ;;
   *)
-    printf 'usage: %s {direct-result|serial-absent|expected-panic|expected-panic-serial-absent}\n' "$0" >&2
+    printf 'usage: %s {direct-result|serial-absent|expected-panic|expected-panic-serial-absent|bad-revision|bad-data|bad-bss}\n' "$0" >&2
     exit 2
     ;;
 esac

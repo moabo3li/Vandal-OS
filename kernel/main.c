@@ -1,9 +1,11 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include <limine.h>
 
 #include "guest_result.h"
+#include "panic.h"
 #include "serial.h"
 
 _Static_assert(sizeof(size_t) == 8, "x86-64 size_t must be 64 bits");
@@ -40,11 +42,17 @@ __attribute__((noreturn)) void kernel_main(void) {
     /* Keep these entry requirements explicit while no IDT exists. */
     __asm__ volatile("cli\ncld" ::: "memory");
 
+    bool serial_ready = serial_init();
+
 #if defined(VANDAL_TEST_GUEST_RESULT)
     guest_result_report(GUEST_RESULT_TEST_OK);
 #endif
 
-    if (!serial_init()) {
+#if defined(VANDAL_TEST_PANIC)
+    kernel_panic(KERNEL_PANIC_TEST);
+#endif
+
+    if (!serial_ready) {
         guest_result_report(GUEST_RESULT_SERIAL_UNAVAILABLE);
     }
 

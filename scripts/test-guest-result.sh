@@ -18,8 +18,20 @@ case "$mode" in
     build_args=(BUILD_DIR="$build_dir")
     serial_backend=none
     ;;
+  expected-panic)
+    build_dir="build/test-panic"
+    expected_status=37
+    build_args=(BUILD_DIR="$build_dir" EXTRA_CFLAGS=-DVANDAL_TEST_PANIC)
+    serial_backend=stdio
+    ;;
+  expected-panic-serial-absent)
+    build_dir="build/test-panic"
+    expected_status=37
+    build_args=(BUILD_DIR="$build_dir" EXTRA_CFLAGS=-DVANDAL_TEST_PANIC)
+    serial_backend=none
+    ;;
   *)
-    printf 'usage: %s {direct-result|serial-absent}\n' "$0" >&2
+    printf 'usage: %s {direct-result|serial-absent|expected-panic|expected-panic-serial-absent}\n' "$0" >&2
     exit 2
     ;;
 esac

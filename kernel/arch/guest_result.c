@@ -8,7 +8,7 @@
 _Static_assert(GUEST_RESULT_UNEXPECTED_PANIC <= UINT16_MAX,
                "guest result must fit the selected port-write width");
 
-__attribute__((noreturn)) void guest_result_report(enum guest_result result) {
+__attribute__((noreturn)) void guest_result_report(guest_result result) {
     outw(GUEST_RESULT_PORT, (uint16_t)result);
 
     __asm__ volatile("cli" ::: "memory");

@@ -10,18 +10,32 @@ if [[ "${1:-}" == "--debug" ]]; then
   shift
 fi
 
-make all
+image_path="${1:-}"
+if [[ -z "$image_path" ]]; then
+  printf 'usage: %s [--debug] ISO_PATH [QEMU_ARGUMENT ...]\n' "$0" >&2
+  exit 2
+fi
+shift
 
-if ! command -v qemu-system-x86_64 >/dev/null; then
-  printf 'error: qemu-system-x86_64 is required to run Vandal-OS\n' >&2
+qemu="${QEMU:-qemu-system-x86_64}"
+machine="${VANDAL_QEMU_MACHINE:-pc-q35-10.1}"
+accelerator="${VANDAL_QEMU_ACCEL:-tcg}"
+
+if [[ ! -r "$image_path" ]]; then
+  printf 'error: ISO image is not readable: %s\n' "$image_path" >&2
+  exit 1
+fi
+
+if ! command -v "$qemu" >/dev/null; then
+  printf 'error: %s is required to run Vandal-OS\n' "$qemu" >&2
   exit 1
 fi
 
 qemu_flags=(
-  -machine q35
+  -machine "$machine",accel="$accelerator"
   -m 128M
   -smp 1
-  -cdrom build/vandal-os.iso
+  -cdrom "$image_path"
   -boot d
   -display none
   -serial stdio
@@ -35,4 +49,4 @@ if [[ "$debug" == true ]]; then
   printf 'QEMU paused; attach GDB to localhost:1234\n'
 fi
 
-exec qemu-system-x86_64 "${qemu_flags[@]}" "$@"
+exec "$qemu" "${qemu_flags[@]}" "$@"

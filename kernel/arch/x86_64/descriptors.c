@@ -38,8 +38,9 @@ _Static_assert(sizeof(struct table_pointer) == 10, "GDTR operand must be 10 byte
 _Static_assert(offsetof(struct table_pointer, base) == 2, "GDTR base offset must be 2");
 
 /*
- * A 64-bit TSS system descriptor occupies two consecutive GDT slots. Its
- * fields will be populated when the kernel-owned TSS is added.
+ * A 64-bit TSS system descriptor occupies two consecutive GDT slots. The
+ * split fields reconstruct one 64-bit TSS base and a 20-bit segment limit;
+ * the upper slot also contains 32 reserved bits that must remain zero.
  */
 struct __attribute__((packed)) tss_descriptor {
     uint16_t limit_low;
@@ -80,10 +81,60 @@ _Static_assert(sizeof(struct global_descriptor_table) == GDT_ENTRY_COUNT * 8U,
                "unexpected GDT size");
 
 /*
+ * Hardware-defined 64-bit TSS byte layout. RSP0 will name the future
+ * privilege-entry stack, while ist[0] is architectural IST1 because IDT IST
+ * indices are one-based. All reserved fields must remain zero.
+ */
+struct __attribute__((packed)) tss {
+    uint32_t reserved0;
+    uint64_t rsp0;
+    uint64_t rsp1;
+    uint64_t rsp2;
+    uint64_t reserved1;
+    uint64_t ist[7];
+    uint64_t reserved2;
+    uint16_t reserved3;
+    uint16_t io_map_base;
+};
+
+_Static_assert(sizeof(struct tss) == 104, "64-bit TSS size");
+_Static_assert(offsetof(struct tss, rsp0) == 4, "RSP0 offset");
+_Static_assert(offsetof(struct tss, ist[0]) == 36, "IST1 offset");
+_Static_assert(offsetof(struct tss, io_map_base) == 102, "I/O-map offset field");
+
+enum {
+    RSP0_STACK_SIZE = 16 * 1024,
+    DOUBLE_FAULT_STACK_SIZE = 16 * 1024,
+};
+
+/*
+ * These statically owned intervals exist for the kernel's entire lifetime.
+ * They grow downward from their one-past-the-array addresses. The RSP0 stack
+ * is future privilege-entry state; it is not the Limine stack currently
+ * executing kernel_main. The second interval is reserved exclusively for
+ * architectural IST1 and eventual double-fault delivery.
+ */
+__attribute__((used, aligned(16))) static uint8_t rsp0_stack[RSP0_STACK_SIZE];
+
+__attribute__((used, aligned(16))) static uint8_t double_fault_stack[DOUBLE_FAULT_STACK_SIZE];
+
+/*
+ * The CPU starts each downward-growing stack at its top, so both stored values
+ * are one-past their arrays. ist[0] supplies architectural IST1. Setting the
+ * I/O-map base one byte beyond the TSS limit declares that no permission
+ * bitmap is present; all unspecified and reserved fields remain zero.
+ */
+__attribute__((used, aligned(16))) static struct tss kernel_tss = {
+    .rsp0 = (uintptr_t)&rsp0_stack[RSP0_STACK_SIZE],
+    .ist[0] = (uintptr_t)&double_fault_stack[DOUBLE_FAULT_STACK_SIZE],
+    .io_map_base = sizeof(struct tss),
+};
+
+/*
  * This table is deliberately dormant. Merely emitting these bytes does not
- * change the CPU's cached descriptor state. The two TSS slots remain zero
- * until a later step encodes the 16-byte system descriptor, and no code in
- * this translation unit changes GDTR or TR.
+ * change the CPU's cached descriptor state. Its TSS member remains zero until
+ * prepare_gdt is called, and no code in this translation unit changes GDTR or
+ * TR.
  */
 __attribute__((used, aligned(16))) static struct global_descriptor_table gdt = {
     .null_descriptor = 0,
@@ -103,3 +154,34 @@ __attribute__((used)) static const struct table_pointer gdt_operand = {
     .limit = (uint16_t)(sizeof(gdt) - 1U),
     .base = (uintptr_t)&gdt,
 };
+
+/*
+ * Construct the available 64-bit TSS descriptor in ordinary memory. This
+ * helper only splits the TSS base and limit into their architectural fields;
+ * it neither writes the result into gdt nor changes any CPU register. Starting
+ * from zero also keeps every reserved bit clear.
+ */
+__attribute__((used)) static struct tss_descriptor make_kernel_tss_descriptor(void) {
+    struct tss_descriptor descriptor = {0};
+    uintptr_t base = (uintptr_t)&kernel_tss;
+    uint32_t limit = (uint32_t)sizeof(kernel_tss) - 1U;
+
+    descriptor.limit_low = (uint16_t)(limit & UINT32_C(0xffff));
+    descriptor.base_low = (uint16_t)(base & (uintptr_t)UINT32_C(0xffff));
+    descriptor.base_mid = (uint8_t)((base >> 16) & (uintptr_t)UINT32_C(0xff));
+    descriptor.access = UINT8_C(0x89); /* present, DPL 0, available 64-bit TSS */
+    descriptor.limit_high_flags = (uint8_t)((limit >> 16) & UINT32_C(0x0f));
+    descriptor.base_high = (uint8_t)((base >> 24) & (uintptr_t)UINT32_C(0xff));
+    descriptor.base_upper = (uint32_t)(base >> 32);
+
+    return descriptor;
+}
+
+/*
+ * Populate only the GDT's 16-byte TSS member. The used attribute preserves
+ * this dormant helper for object inspection; it does not call the function.
+ * Calling it writes ordinary memory but still does not change GDTR or TR.
+ */
+__attribute__((used)) static void prepare_gdt(void) {
+    gdt.tss_descriptor = make_kernel_tss_descriptor();
+}

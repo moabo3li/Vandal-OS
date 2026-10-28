@@ -49,9 +49,15 @@ KERNEL_LDFLAGS := \
 HOST_TEST_CPPFLAGS := -DVANDAL_SERIAL_TEST -Ikernel
 HOST_TEST_CFLAGS := -std=c11 -O2 -g3 -Wall -Wextra -Wpedantic -Werror
 
-KERNEL_SOURCES := kernel/main.c kernel/serial.c kernel/arch/guest_result.c kernel/panic.c
+KERNEL_SOURCES := \
+	kernel/main.c \
+	kernel/serial.c \
+	kernel/arch/guest_result.c \
+	kernel/arch/x86_64/descriptors.c \
+	kernel/panic.c
 KERNEL_OBJECTS := $(KERNEL_SOURCES:kernel/%.c=$(BUILD_DIR)/kernel/%.o)
-FORMAT_FILES := $(KERNEL_SOURCES) kernel/serial.h kernel/arch/x86_64/io.h kernel/guest_result.h kernel/panic.h tests/serial_test.c
+FORMAT_FILES := $(KERNEL_SOURCES) kernel/serial.h kernel/arch/x86_64/io.h \
+	kernel/guest_result.h kernel/panic.h tests/serial_test.c
 SCRIPT_FILES := run.sh scripts/run-qemu.sh scripts/test-guest-result.sh scripts/verify-artifact.sh
 SERIAL_TEST_BINARY := $(HOST_TEST_DIR)/serial-test
 SERIAL_TEST_SOURCES := tests/serial_test.c kernel/serial.c
@@ -222,9 +228,11 @@ $(LSP_DATABASE): $(KERNEL_SOURCES) tests/serial_test.c Makefile $(LIMINE_HEADER)
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.serial.tmp -fsyntax-only kernel/serial.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.panic.tmp -fsyntax-only kernel/panic.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.guest-result.tmp -fsyntax-only kernel/arch/guest_result.c
+	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.descriptors.tmp -fsyntax-only kernel/arch/x86_64/descriptors.c
 	$(HOST_CC) $(HOST_TEST_CPPFLAGS) $(HOST_TEST_CFLAGS) -MJ $@.serial-test.tmp -fsyntax-only tests/serial_test.c
 	@{ printf '[\n'; sed -n 'p' $@.main.tmp; sed -n 'p' $@.serial.tmp; \
 		sed -n 'p' $@.panic.tmp; sed -n 'p' $@.guest-result.tmp; \
+		sed -n 'p' $@.descriptors.tmp; \
 		sed '$$s/,$$//' $@.serial-test.tmp; printf ']\n'; } >$@
 	@rm -f $@.*.tmp
 

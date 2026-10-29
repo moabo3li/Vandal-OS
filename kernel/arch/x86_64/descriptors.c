@@ -44,6 +44,12 @@ _Static_assert(offsetof(struct table_pointer, base) == 2, "GDTR base offset must
  */
 extern void load_descriptor_state(const struct table_pointer *operand);
 
+/* Copy the current ten-byte GDTR value into result without changing GDTR. */
+extern void read_gdtr(struct table_pointer *result);
+
+/* Return the visible task-register selector without changing TR. */
+extern uint16_t read_tr(void);
+
 /*
  * A 64-bit TSS system descriptor occupies two consecutive GDT slots. The
  * split fields reconstruct one 64-bit TSS base and a 20-bit segment limit;

@@ -9,10 +9,13 @@ typedef enum guest_result {
     GUEST_RESULT_DATA_CORRUPT = 0x14,
     GUEST_RESULT_BSS_NOT_ZERO = 0x15,
     GUEST_RESULT_UNEXPECTED_PANIC = 0x16,
+    GUEST_RESULT_DESCRIPTORS_REINITIALIZED = 0x17,
+    GUEST_RESULT_DESCRIPTORS_PREFLIGHT = 0x18,
+    GUEST_RESULT_DESCRIPTORS_READBACK = 0x19,
 } guest_result;
 
 /* QEMU converts this value to an 8-bit process status with (value << 1) | 1. */
-_Static_assert(GUEST_RESULT_UNEXPECTED_PANIC <= 0x7f,
+_Static_assert(GUEST_RESULT_DESCRIPTORS_READBACK <= 0x7f,
                "guest results must remain distinguishable as process statuses");
 
 /* Report one test result to QEMU, then halt if the device is unavailable. */

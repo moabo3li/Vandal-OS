@@ -38,6 +38,13 @@ _Static_assert(sizeof(struct table_pointer) == 10, "GDTR operand must be 10 byte
 _Static_assert(offsetof(struct table_pointer, base) == 2, "GDTR base offset must be 2");
 
 /*
+ * Assembly boundary for installing the prepared descriptor state. The helper
+ * reads the operand but does not retain its address; descriptors_init will
+ * enforce its privileged preconditions before calling it.
+ */
+extern void load_descriptor_state(const struct table_pointer *operand);
+
+/*
  * A 64-bit TSS system descriptor occupies two consecutive GDT slots. The
  * split fields reconstruct one 64-bit TSS base and a 20-bit segment limit;
  * the upper slot also contains 32 reserved bits that must remain zero.

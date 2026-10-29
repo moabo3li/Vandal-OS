@@ -37,4 +37,27 @@ load_descriptor_state:
 
 .size load_descriptor_state, .-load_descriptor_state
 
+/*
+ * Copy the current ten-byte GDTR value into the writable object whose address
+ * arrives in RDI. SGDT observes descriptor state without changing it.
+ */
+.globl read_gdtr
+.type read_gdtr, @function
+read_gdtr:
+    sgdt (%rdi)
+    ret
+.size read_gdtr, .-read_gdtr
+
+/*
+ * Return the visible 16-bit task-register selector in AX. Clearing EAX first
+ * makes the full return register deterministic; STR itself does not change TR.
+ */
+.globl read_tr
+.type read_tr, @function
+read_tr:
+    xorl %eax, %eax
+    str %ax
+    ret
+.size read_tr, .-read_tr
+
 .section .note.GNU-stack,"",@progbits

@@ -6,6 +6,9 @@ typedef enum kernel_panic_reason {
     KERNEL_PANIC_LIMINE_REVISION,
     KERNEL_PANIC_DATA_CORRUPT,
     KERNEL_PANIC_BSS_NOT_ZERO,
+    KERNEL_PANIC_DESCRIPTORS_REINITIALIZED,
+    KERNEL_PANIC_DESCRIPTORS_PREFLIGHT,
+    KERNEL_PANIC_DESCRIPTORS_READBACK,
 } kernel_panic_reason;
 
 /* Publish one terminal kernel failure; this function never returns. */

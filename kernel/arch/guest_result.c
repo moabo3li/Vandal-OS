@@ -5,7 +5,7 @@
 
 #define GUEST_RESULT_PORT UINT16_C(0x0501)
 
-_Static_assert(GUEST_RESULT_UNEXPECTED_PANIC <= UINT16_MAX,
+_Static_assert(GUEST_RESULT_DESCRIPTORS_READBACK <= UINT16_MAX,
                "guest result must fit the selected port-write width");
 
 __attribute__((noreturn)) void guest_result_report(guest_result result) {

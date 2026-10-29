@@ -62,7 +62,7 @@ KERNEL_OBJECTS := \
 	$(KERNEL_SOURCES:kernel/%.c=$(BUILD_DIR)/kernel/%.o) \
 	$(KERNEL_ASM_OBJECTS)
 FORMAT_FILES := $(KERNEL_SOURCES) kernel/serial.h kernel/arch/x86_64/io.h \
-	kernel/guest_result.h kernel/panic.h tests/serial_test.c
+	kernel/arch/x86_64/descriptors.h kernel/guest_result.h kernel/panic.h tests/serial_test.c
 SCRIPT_FILES := run.sh scripts/run-qemu.sh scripts/test-guest-result.sh scripts/verify-artifact.sh
 SERIAL_TEST_BINARY := $(HOST_TEST_DIR)/serial-test
 SERIAL_TEST_SOURCES := tests/serial_test.c kernel/serial.c

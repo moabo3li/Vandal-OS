@@ -29,6 +29,21 @@ static panic_desc panic_describe(kernel_panic_reason reason) {
             "Vandal-OS panic: BSS is not zero\r\n",
             GUEST_RESULT_BSS_NOT_ZERO,
         };
+    case KERNEL_PANIC_DESCRIPTORS_REINITIALIZED:
+        return (panic_desc){
+            "Vandal-OS panic: descriptor state initialized more than once\r\n",
+            GUEST_RESULT_DESCRIPTORS_REINITIALIZED,
+        };
+    case KERNEL_PANIC_DESCRIPTORS_PREFLIGHT:
+        return (panic_desc){
+            "Vandal-OS panic: descriptor state failed preflight\r\n",
+            GUEST_RESULT_DESCRIPTORS_PREFLIGHT,
+        };
+    case KERNEL_PANIC_DESCRIPTORS_READBACK:
+        return (panic_desc){
+            "Vandal-OS panic: descriptor state readback mismatch\r\n",
+            GUEST_RESULT_DESCRIPTORS_READBACK,
+        };
     }
 
     return (panic_desc){

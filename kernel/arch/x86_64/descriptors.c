@@ -1,5 +1,9 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include "../../panic.h"
+#include "descriptors.h"
 
 #define GDT_KERNEL_CODE UINT64_C(0x00af9a000000ffff)
 #define GDT_KERNEL_DATA UINT64_C(0x00cf92000000ffff)
@@ -39,8 +43,9 @@ _Static_assert(offsetof(struct table_pointer, base) == 2, "GDTR base offset must
 
 /*
  * Assembly boundary for installing the prepared descriptor state. The helper
- * reads the operand but does not retain its address; descriptors_init will
- * enforce its privileged preconditions before calling it.
+ * reads the operand but does not retain its address. descriptors_init verifies
+ * the owned memory first; CPL 0, IF clear, and a valid current stack remain
+ * caller preconditions.
  */
 extern void load_descriptor_state(const struct table_pointer *operand);
 
@@ -144,10 +149,9 @@ __attribute__((used, aligned(16))) static struct tss kernel_tss = {
 };
 
 /*
- * This table is deliberately dormant. Merely emitting these bytes does not
- * change the CPU's cached descriptor state. Its TSS member remains zero until
- * prepare_gdt is called, and no code in this translation unit changes GDTR or
- * TR.
+ * This table begins dormant. Merely emitting these bytes does not change the
+ * CPU's cached descriptor state. Its TSS member remains zero until prepare_gdt
+ * is called, and descriptors_init activates it only after memory preflight.
  */
 __attribute__((used, aligned(16))) static struct global_descriptor_table gdt = {
     .null_descriptor = 0,
@@ -174,7 +178,7 @@ __attribute__((used)) static const struct table_pointer gdt_operand = {
  * it neither writes the result into gdt nor changes any CPU register. Starting
  * from zero also keeps every reserved bit clear.
  */
-__attribute__((used)) static struct tss_descriptor make_kernel_tss_descriptor(void) {
+static struct tss_descriptor make_kernel_tss_descriptor(void) {
     struct tss_descriptor descriptor = {0};
     uintptr_t base = (uintptr_t)&kernel_tss;
     uint32_t limit = (uint32_t)sizeof(kernel_tss) - 1U;
@@ -191,10 +195,112 @@ __attribute__((used)) static struct tss_descriptor make_kernel_tss_descriptor(vo
 }
 
 /*
- * Populate only the GDT's 16-byte TSS member. The used attribute preserves
- * this dormant helper for object inspection; it does not call the function.
- * Calling it writes ordinary memory but still does not change GDTR or TR.
+ * Populate only the GDT's 16-byte TSS member. This writes ordinary memory but
+ * still does not change GDTR or TR; activation remains a later explicit step.
  */
-__attribute__((used)) static void prepare_gdt(void) {
+static void prepare_gdt(void) {
     gdt.tss_descriptor = make_kernel_tss_descriptor();
+}
+
+/* Track the one-way initialization transition and reject a second LTR. */
+enum descriptor_state {
+    DESCRIPTORS_UNINITIALIZED,
+    DESCRIPTORS_INSTALLING,
+    DESCRIPTORS_READY,
+};
+
+static enum descriptor_state descriptor_state = DESCRIPTORS_UNINITIALIZED;
+
+/* Decode the split 64-bit base independently from the descriptor encoder. */
+static uintptr_t tss_descriptor_base(const struct tss_descriptor *descriptor) {
+    return (uintptr_t)descriptor->base_low | ((uintptr_t)descriptor->base_mid << 16) |
+           ((uintptr_t)descriptor->base_high << 24) | ((uintptr_t)descriptor->base_upper << 32);
+}
+
+/* Decode the split 20-bit byte limit independently from the encoder. */
+static uint32_t tss_descriptor_limit(const struct tss_descriptor *descriptor) {
+    return (uint32_t)descriptor->limit_low |
+           ((uint32_t)(descriptor->limit_high_flags & UINT8_C(0x0f)) << 16);
+}
+
+/* Verify the prepared TSS object, including its absent-I/O-map policy. */
+static bool kernel_tss_is_valid(void) {
+    if (kernel_tss.reserved0 != 0 || kernel_tss.rsp1 != 0 || kernel_tss.rsp2 != 0 ||
+        kernel_tss.reserved1 != 0 || kernel_tss.reserved2 != 0 || kernel_tss.reserved3 != 0) {
+        return false;
+    }
+
+    for (size_t index = 1; index < 7; index++) {
+        if (kernel_tss.ist[index] != 0) {
+            return false;
+        }
+    }
+
+    return kernel_tss.rsp0 == (uintptr_t)&rsp0_stack[RSP0_STACK_SIZE] &&
+           kernel_tss.ist[0] == (uintptr_t)&double_fault_stack[DOUBLE_FAULT_STACK_SIZE] &&
+           kernel_tss.io_map_base == sizeof(kernel_tss);
+}
+
+/*
+ * Check ordinary memory before the first privileged state change. This does
+ * not inspect live CPU state or prove that the processor will accept it.
+ */
+static bool prepared_state_is_valid(void) {
+    const struct tss_descriptor *descriptor = &gdt.tss_descriptor;
+
+    if (gdt.null_descriptor != 0 || gdt.kernel_code_descriptor != GDT_KERNEL_CODE ||
+        gdt.kernel_data_descriptor != GDT_KERNEL_DATA || gdt_operand.base != (uintptr_t)&gdt ||
+        gdt_operand.limit != sizeof(gdt) - 1U) {
+        return false;
+    }
+
+    if (tss_descriptor_base(descriptor) != (uintptr_t)&kernel_tss ||
+        tss_descriptor_limit(descriptor) != sizeof(kernel_tss) - 1U ||
+        descriptor->access != UINT8_C(0x89) ||
+        (descriptor->limit_high_flags & UINT8_C(0xf0)) != 0 || descriptor->reserved != 0) {
+        return false;
+    }
+
+    return kernel_tss_is_valid();
+}
+
+/*
+ * Read visible GDTR and TR state after activation and confirm LTR's in-memory
+ * busy transition. Hidden descriptor-cache fields require later behavioral
+ * evidence and are not exposed by these readbacks.
+ */
+static bool live_descriptor_state_is_valid(void) {
+    struct table_pointer observed_gdtr = {0};
+    uint16_t observed_tr;
+
+    read_gdtr(&observed_gdtr);
+    observed_tr = read_tr();
+
+    return observed_gdtr.base == gdt_operand.base && observed_gdtr.limit == gdt_operand.limit &&
+           observed_tr == GDT_TSS_SELECTOR && gdt.tss_descriptor.access == UINT8_C(0x8b);
+}
+
+/*
+ * Perform the one-way dormant-to-live transition. Reject reuse before touching
+ * the GDT and publish READY only after the visible CPU state matches.
+ */
+void descriptors_init(void) {
+    if (descriptor_state != DESCRIPTORS_UNINITIALIZED) {
+        kernel_panic(KERNEL_PANIC_DESCRIPTORS_REINITIALIZED);
+    }
+
+    prepare_gdt();
+
+    if (!prepared_state_is_valid()) {
+        kernel_panic(KERNEL_PANIC_DESCRIPTORS_PREFLIGHT);
+    }
+
+    descriptor_state = DESCRIPTORS_INSTALLING;
+    load_descriptor_state(&gdt_operand);
+
+    if (!live_descriptor_state_is_valid()) {
+        kernel_panic(KERNEL_PANIC_DESCRIPTORS_READBACK);
+    }
+
+    descriptor_state = DESCRIPTORS_READY;
 }

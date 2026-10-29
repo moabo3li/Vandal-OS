@@ -55,7 +55,12 @@ KERNEL_SOURCES := \
 	kernel/arch/guest_result.c \
 	kernel/arch/x86_64/descriptors.c \
 	kernel/panic.c
-KERNEL_OBJECTS := $(KERNEL_SOURCES:kernel/%.c=$(BUILD_DIR)/kernel/%.o)
+KERNEL_ASM_SOURCES := \
+	kernel/arch/x86_64/descriptors_load.S
+KERNEL_ASM_OBJECTS := $(KERNEL_ASM_SOURCES:kernel/%.S=$(BUILD_DIR)/kernel/%.o)
+KERNEL_OBJECTS := \
+	$(KERNEL_SOURCES:kernel/%.c=$(BUILD_DIR)/kernel/%.o) \
+	$(KERNEL_ASM_OBJECTS)
 FORMAT_FILES := $(KERNEL_SOURCES) kernel/serial.h kernel/arch/x86_64/io.h \
 	kernel/guest_result.h kernel/panic.h tests/serial_test.c
 SCRIPT_FILES := run.sh scripts/run-qemu.sh scripts/test-guest-result.sh scripts/verify-artifact.sh
@@ -218,21 +223,28 @@ $(BUILD_DIR)/kernel/%.o: kernel/%.c Makefile $(LIMINE_HEADER) | check-compiler-t
 	@mkdir -p $(@D)
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MMD -MP -c $< -o $@
 
+$(BUILD_DIR)/kernel/%.o: kernel/%.S Makefile | check-compiler-tools
+	@mkdir -p $(@D)
+	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MMD -MP -c $< -o $@
+
 $(SERIAL_TEST_BINARY): $(SERIAL_TEST_SOURCES) kernel/serial.h Makefile | check-compiler-tools
 	@mkdir -p $(@D)
 	$(HOST_CC) $(HOST_TEST_CPPFLAGS) $(HOST_TEST_CFLAGS) $(SERIAL_TEST_SOURCES) -o $@
 
-$(LSP_DATABASE): $(KERNEL_SOURCES) tests/serial_test.c Makefile $(LIMINE_HEADER) | check-compiler-tools
+$(LSP_DATABASE): $(KERNEL_SOURCES) $(KERNEL_ASM_SOURCES) tests/serial_test.c Makefile \
+	$(LIMINE_HEADER) | check-compiler-tools
 	@mkdir -p $(@D)
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.main.tmp -fsyntax-only kernel/main.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.serial.tmp -fsyntax-only kernel/serial.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.panic.tmp -fsyntax-only kernel/panic.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.guest-result.tmp -fsyntax-only kernel/arch/guest_result.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.descriptors.tmp -fsyntax-only kernel/arch/x86_64/descriptors.c
+	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.descriptors-load.tmp \
+		-c kernel/arch/x86_64/descriptors_load.S -o /dev/null
 	$(HOST_CC) $(HOST_TEST_CPPFLAGS) $(HOST_TEST_CFLAGS) -MJ $@.serial-test.tmp -fsyntax-only tests/serial_test.c
 	@{ printf '[\n'; sed -n 'p' $@.main.tmp; sed -n 'p' $@.serial.tmp; \
 		sed -n 'p' $@.panic.tmp; sed -n 'p' $@.guest-result.tmp; \
-		sed -n 'p' $@.descriptors.tmp; \
+		sed -n 'p' $@.descriptors.tmp; sed -n 'p' $@.descriptors-load.tmp; \
 		sed '$$s/,$$//' $@.serial-test.tmp; printf ']\n'; } >$@
 	@rm -f $@.*.tmp
 

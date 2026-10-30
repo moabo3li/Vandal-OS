@@ -3,6 +3,7 @@ SHELL := /bin/sh
 
 TARGET_CC ?= clang
 HOST_CC ?= clang
+GDB ?= gdb
 XORRISO ?= xorriso
 QEMU ?= qemu-system-x86_64
 QEMU_MACHINE ?= pc-q35-10.1
@@ -17,6 +18,7 @@ LSP_DATABASE := $(SHARED_BUILD_DIR)/compile_commands.json
 HOST_TEST_DIR := $(SHARED_BUILD_DIR)/tests/host
 QEMU_TEST_DIR := $(SHARED_BUILD_DIR)/tests/qemu
 TEST_RESULTS_DIR := $(SHARED_BUILD_DIR)/test-results
+GDB_COMMAND_FILE := scripts/kernel.gdb
 
 LIMINE_VERSION := 12.9.3
 LIMINE_ARCHIVE := $(DOWNLOAD_DIR)/limine-binary-$(LIMINE_VERSION).tar.xz
@@ -69,17 +71,18 @@ KERNEL_OBJECTS := \
 	$(KERNEL_C_SOURCES:kernel/%.c=$(BUILD_DIR)/kernel/%.o) \
 	$(KERNEL_ASM_OBJECTS)
 FORMAT_FILES := $(KERNEL_C_SOURCES) $(KERNEL_HEADERS) tests/serial_test.c
-SCRIPT_FILES := run.sh scripts/run-qemu.sh scripts/test-guest-result.sh scripts/verify-artifact.sh
+SCRIPT_FILES := run.sh scripts/debug-kernel.sh scripts/run-qemu.sh scripts/test-guest-result.sh \
+	scripts/verify-artifact.sh
 SERIAL_TEST_BINARY := $(HOST_TEST_DIR)/serial-test
 SERIAL_TEST_SOURCES := tests/serial_test.c kernel/drivers/serial.c
 
-.PHONY: all run debug \
+.PHONY: all run debug gdb \
 	test test-host test-serial test-qemu test-guest-result test-panic test-limine-handoff \
 	test-qemu-direct test-qemu-serial-absent test-qemu-panic \
 	test-qemu-panic-serial-absent test-qemu-bad-revision test-qemu-bad-data \
 	test-qemu-bad-bss test-artifact \
 	lsp format check-format check-scripts check check-tools check-compiler-tools \
-	check-download-tools check-image-tools check-qemu-tools check-format-tools \
+	check-download-tools check-image-tools check-qemu-tools check-gdb-tools check-format-tools \
 	check-artifact-tools clean
 
 all: $(BUILD_DIR)/vandal-os.iso
@@ -91,6 +94,11 @@ run: all | check-qemu-tools
 debug: all | check-qemu-tools
 	VANDAL_QEMU_MACHINE=$(QEMU_MACHINE) VANDAL_QEMU_ACCEL=$(QEMU_ACCEL) \
 		./scripts/run-qemu.sh --debug $(BUILD_DIR)/vandal-os.iso
+
+gdb: all $(GDB_COMMAND_FILE) scripts/debug-kernel.sh | check-qemu-tools check-gdb-tools
+	GDB=$(GDB) QEMU=$(QEMU) VANDAL_QEMU_MACHINE=$(QEMU_MACHINE) \
+		VANDAL_QEMU_ACCEL=$(QEMU_ACCEL) ./scripts/debug-kernel.sh \
+		$(BUILD_DIR)/kernel.elf $(BUILD_DIR)/vandal-os.iso $(GDB_COMMAND_FILE)
 
 test:
 	$(MAKE) test-host
@@ -215,6 +223,9 @@ check-image-tools:
 check-qemu-tools:
 	@command -v $(QEMU) >/dev/null || { echo "error: $(QEMU) is required" >&2; exit 1; }
 	@command -v timeout >/dev/null || { echo "error: GNU timeout is required" >&2; exit 1; }
+
+check-gdb-tools:
+	@command -v $(GDB) >/dev/null || { echo "error: $(GDB) is required" >&2; exit 1; }
 
 check-format-tools:
 	@command -v clang-format >/dev/null || { echo "error: clang-format is required" >&2; exit 1; }

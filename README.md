@@ -65,7 +65,13 @@ database in `build/compile_commands.json`.
 ## Project files
 
 - `kernel/main.c` contains the kernel entry point and halt loop.
-- `kernel/linker.ld` defines the ELF memory layout.
+- `kernel/panic.c` and `kernel/guest_result.h` own architecture-neutral failure
+  policy and its reporting interface.
+- `kernel/arch/x86_64/` owns x86-64 descriptor state, port-I/O primitives, and
+  the architecture-specific ELF layout.
+- `kernel/drivers/` owns hardware-device drivers such as the polling COM1
+  implementation.
+- `kernel/platform/qemu/` owns the QEMU-only guest-result transport.
 - `boot/limine.conf` contains the bootloader configuration.
 - `Makefile` builds the kernel and bootable ISO.
 - `scripts/run-qemu.sh` executes an explicit ISO in QEMU.

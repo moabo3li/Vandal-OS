@@ -1,6 +1,6 @@
 #include "panic.h"
+#include "drivers/serial.h"
 #include "guest_result.h"
-#include "serial.h"
 
 typedef struct panic_desc {
     const char *message;

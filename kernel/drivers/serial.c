@@ -8,7 +8,7 @@ uint8_t serial_test_inb(uint16_t port);
 #define outb serial_test_outb
 #define inb serial_test_inb
 #else
-#include "arch/x86_64/io.h"
+#include "../arch/x86_64/io.h"
 #endif
 
 /* ISA I/O-port base for the first 16550-compatible serial device. */

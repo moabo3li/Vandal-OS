@@ -1,5 +1,5 @@
-#ifndef VANDAL_SERIAL_H
-#define VANDAL_SERIAL_H
+#ifndef VANDAL_DRIVERS_SERIAL_H
+#define VANDAL_DRIVERS_SERIAL_H
 
 #include <stdbool.h>
 

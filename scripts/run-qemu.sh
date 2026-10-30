@@ -20,6 +20,7 @@ shift
 qemu="${QEMU:-qemu-system-x86_64}"
 machine="${VANDAL_QEMU_MACHINE:-pc-q35-10.1}"
 accelerator="${VANDAL_QEMU_ACCEL:-tcg}"
+serial="${VANDAL_QEMU_SERIAL:-stdio}"
 
 if [[ ! -r "$image_path" ]]; then
   printf 'error: ISO image is not readable: %s\n' "$image_path" >&2
@@ -38,7 +39,7 @@ qemu_flags=(
   -cdrom "$image_path"
   -boot d
   -display none
-  -serial stdio
+  -serial "$serial"
   -monitor none
   -no-reboot
   -no-shutdown

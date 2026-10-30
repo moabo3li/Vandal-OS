@@ -1,4 +1,6 @@
 .section .text
+
+/* Privileged descriptor-register transitions and their readback boundaries. */
 .globl load_descriptor_state
 .type load_descriptor_state, @function
 

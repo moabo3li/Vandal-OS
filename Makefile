@@ -56,7 +56,7 @@ KERNEL_SOURCES := \
 	kernel/arch/x86_64/descriptors.c \
 	kernel/panic.c
 KERNEL_ASM_SOURCES := \
-	kernel/arch/x86_64/descriptors_load.S
+	kernel/arch/x86_64/descriptor_state.S
 KERNEL_ASM_OBJECTS := $(KERNEL_ASM_SOURCES:kernel/%.S=$(BUILD_DIR)/kernel/%.o)
 KERNEL_OBJECTS := \
 	$(KERNEL_SOURCES:kernel/%.c=$(BUILD_DIR)/kernel/%.o) \
@@ -239,12 +239,12 @@ $(LSP_DATABASE): $(KERNEL_SOURCES) $(KERNEL_ASM_SOURCES) tests/serial_test.c Mak
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.panic.tmp -fsyntax-only kernel/panic.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.guest-result.tmp -fsyntax-only kernel/arch/guest_result.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.descriptors.tmp -fsyntax-only kernel/arch/x86_64/descriptors.c
-	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.descriptors-load.tmp \
-		-c kernel/arch/x86_64/descriptors_load.S -o /dev/null
+	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.descriptor-state.tmp \
+		-c kernel/arch/x86_64/descriptor_state.S -o /dev/null
 	$(HOST_CC) $(HOST_TEST_CPPFLAGS) $(HOST_TEST_CFLAGS) -MJ $@.serial-test.tmp -fsyntax-only tests/serial_test.c
 	@{ printf '[\n'; sed -n 'p' $@.main.tmp; sed -n 'p' $@.serial.tmp; \
 		sed -n 'p' $@.panic.tmp; sed -n 'p' $@.guest-result.tmp; \
-		sed -n 'p' $@.descriptors.tmp; sed -n 'p' $@.descriptors-load.tmp; \
+		sed -n 'p' $@.descriptors.tmp; sed -n 'p' $@.descriptor-state.tmp; \
 		sed '$$s/,$$//' $@.serial-test.tmp; printf ']\n'; } >$@
 	@rm -f $@.*.tmp
 

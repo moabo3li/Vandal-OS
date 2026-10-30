@@ -4,6 +4,7 @@
 
 #include <limine.h>
 
+#include "arch/x86_64/descriptors.h"
 #include "drivers/serial.h"
 #include "guest_result.h"
 #include "panic.h"
@@ -94,6 +95,12 @@ __attribute__((noreturn)) void kernel_main(void) {
     }
 
     (void)serial_puts("Vandal-OS: serial ready\r\n");
+
+    descriptors_init();
+
+#if defined(VANDAL_TEST_DESCRIPTORS_REINITIALIZED)
+    descriptors_init();
+#endif
 
     kernel_idle();
 }

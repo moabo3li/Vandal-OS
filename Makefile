@@ -78,9 +78,10 @@ SERIAL_TEST_SOURCES := tests/serial_test.c kernel/drivers/serial.c
 
 .PHONY: all run debug gdb \
 	test test-host test-serial test-qemu test-guest-result test-panic test-limine-handoff \
+	test-descriptors \
 	test-qemu-direct test-qemu-serial-absent test-qemu-panic \
 	test-qemu-panic-serial-absent test-qemu-bad-revision test-qemu-bad-data \
-	test-qemu-bad-bss test-artifact \
+	test-qemu-bad-bss test-qemu-descriptors-reinitialized test-artifact \
 	lsp format check-format check-scripts check check-tools check-compiler-tools \
 	check-download-tools check-image-tools check-qemu-tools check-gdb-tools check-format-tools \
 	check-artifact-tools clean
@@ -118,6 +119,7 @@ test-qemu:
 	$(MAKE) test-qemu-bad-revision
 	$(MAKE) test-qemu-bad-data
 	$(MAKE) test-qemu-bad-bss
+	$(MAKE) test-qemu-descriptors-reinitialized
 
 # Compatibility groups retained for the documented M0 workflows.
 test-guest-result:
@@ -132,6 +134,9 @@ test-limine-handoff:
 	$(MAKE) test-qemu-bad-revision
 	$(MAKE) test-qemu-bad-data
 	$(MAKE) test-qemu-bad-bss
+
+test-descriptors:
+	$(MAKE) test-qemu-descriptors-reinitialized
 
 test-qemu-direct: | check-qemu-tools
 	$(MAKE) BUILD_DIR=$(QEMU_TEST_DIR)/direct EXTRA_CPPFLAGS=-DVANDAL_TEST_GUEST_RESULT all
@@ -182,6 +187,14 @@ test-qemu-bad-bss: | check-qemu-tools
 		./scripts/test-guest-result.sh bad-bss \
 		$(QEMU_TEST_DIR)/bad-bss/vandal-os.iso 43 none \
 		$(TEST_RESULTS_DIR)/bad-bss.log
+
+test-qemu-descriptors-reinitialized: | check-qemu-tools
+	$(MAKE) BUILD_DIR=$(QEMU_TEST_DIR)/descriptors-reinitialized \
+		EXTRA_CPPFLAGS=-DVANDAL_TEST_DESCRIPTORS_REINITIALIZED all
+	VANDAL_QEMU_MACHINE=$(QEMU_MACHINE) VANDAL_QEMU_ACCEL=$(QEMU_ACCEL) \
+		./scripts/test-guest-result.sh descriptors-reinitialized \
+		$(QEMU_TEST_DIR)/descriptors-reinitialized/vandal-os.iso 47 stdio \
+		$(TEST_RESULTS_DIR)/descriptors-reinitialized.log
 
 test-artifact: all | check-artifact-tools
 	./scripts/verify-artifact.sh $(BUILD_DIR)/kernel.elf $(BUILD_DIR)/vandal-os.iso

@@ -1,7 +1,7 @@
 #include <stdint.h>
 
-#include "../guest_result.h"
-#include "x86_64/io.h"
+#include "../../arch/x86_64/io.h"
+#include "../../guest_result.h"
 
 #define GUEST_RESULT_PORT UINT16_C(0x0501)
 

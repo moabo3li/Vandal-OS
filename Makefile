@@ -31,6 +31,7 @@ LIMINE_HEADER_URL := https://raw.githubusercontent.com/limine-bootloader/limine-
 LIMINE_HEADER_SHA256 := 0aadf2633c85d8cb145344c968add158aeb1deb68af567d55ba8431c492b6d4c
 
 KERNEL_CPPFLAGS := -I$(DEPS_DIR)/include $(EXTRA_CPPFLAGS)
+KERNEL_LINKER_SCRIPT := kernel/arch/x86_64/linker.ld
 KERNEL_CFLAGS := \
 	--target=x86_64-unknown-none-elf \
 	-std=c11 -O2 -g3 -Wall -Wextra -Wpedantic -Werror \
@@ -42,30 +43,35 @@ KERNEL_CFLAGS := \
 KERNEL_LDFLAGS := \
 	--target=x86_64-unknown-none-elf -fuse-ld=lld \
 	-nostdlib -static -Wl,-no-pie \
-	-Wl,-T,kernel/linker.ld -Wl,-Map,$(BUILD_DIR)/kernel.map \
+	-Wl,-T,$(KERNEL_LINKER_SCRIPT) -Wl,-Map,$(BUILD_DIR)/kernel.map \
 	-Wl,--gc-sections -Wl,-z,max-page-size=0x1000 \
 	-Wl,-z,noexecstack -Wl,--build-id=none -Wl,--fatal-warnings
 
 HOST_TEST_CPPFLAGS := -DVANDAL_SERIAL_TEST -Ikernel
 HOST_TEST_CFLAGS := -std=c11 -O2 -g3 -Wall -Wextra -Wpedantic -Werror
 
-KERNEL_SOURCES := \
+KERNEL_C_SOURCES := \
 	kernel/main.c \
-	kernel/serial.c \
-	kernel/arch/guest_result.c \
+	kernel/drivers/serial.c \
+	kernel/platform/qemu/guest_result.c \
 	kernel/arch/x86_64/descriptors.c \
 	kernel/panic.c
 KERNEL_ASM_SOURCES := \
 	kernel/arch/x86_64/descriptor_state.S
+KERNEL_HEADERS := \
+	kernel/guest_result.h \
+	kernel/panic.h \
+	kernel/drivers/serial.h \
+	kernel/arch/x86_64/descriptors.h \
+	kernel/arch/x86_64/io.h
 KERNEL_ASM_OBJECTS := $(KERNEL_ASM_SOURCES:kernel/%.S=$(BUILD_DIR)/kernel/%.o)
 KERNEL_OBJECTS := \
-	$(KERNEL_SOURCES:kernel/%.c=$(BUILD_DIR)/kernel/%.o) \
+	$(KERNEL_C_SOURCES:kernel/%.c=$(BUILD_DIR)/kernel/%.o) \
 	$(KERNEL_ASM_OBJECTS)
-FORMAT_FILES := $(KERNEL_SOURCES) kernel/serial.h kernel/arch/x86_64/io.h \
-	kernel/arch/x86_64/descriptors.h kernel/guest_result.h kernel/panic.h tests/serial_test.c
+FORMAT_FILES := $(KERNEL_C_SOURCES) $(KERNEL_HEADERS) tests/serial_test.c
 SCRIPT_FILES := run.sh scripts/run-qemu.sh scripts/test-guest-result.sh scripts/verify-artifact.sh
 SERIAL_TEST_BINARY := $(HOST_TEST_DIR)/serial-test
-SERIAL_TEST_SOURCES := tests/serial_test.c kernel/serial.c
+SERIAL_TEST_SOURCES := tests/serial_test.c kernel/drivers/serial.c
 
 .PHONY: all run debug \
 	test test-host test-serial test-qemu test-guest-result test-panic test-limine-handoff \
@@ -227,17 +233,17 @@ $(BUILD_DIR)/kernel/%.o: kernel/%.S Makefile | check-compiler-tools
 	@mkdir -p $(@D)
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MMD -MP -c $< -o $@
 
-$(SERIAL_TEST_BINARY): $(SERIAL_TEST_SOURCES) kernel/serial.h Makefile | check-compiler-tools
+$(SERIAL_TEST_BINARY): $(SERIAL_TEST_SOURCES) kernel/drivers/serial.h Makefile | check-compiler-tools
 	@mkdir -p $(@D)
 	$(HOST_CC) $(HOST_TEST_CPPFLAGS) $(HOST_TEST_CFLAGS) $(SERIAL_TEST_SOURCES) -o $@
 
-$(LSP_DATABASE): $(KERNEL_SOURCES) $(KERNEL_ASM_SOURCES) tests/serial_test.c Makefile \
+$(LSP_DATABASE): $(KERNEL_C_SOURCES) $(KERNEL_ASM_SOURCES) tests/serial_test.c Makefile \
 	$(LIMINE_HEADER) | check-compiler-tools
 	@mkdir -p $(@D)
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.main.tmp -fsyntax-only kernel/main.c
-	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.serial.tmp -fsyntax-only kernel/serial.c
+	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.serial.tmp -fsyntax-only kernel/drivers/serial.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.panic.tmp -fsyntax-only kernel/panic.c
-	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.guest-result.tmp -fsyntax-only kernel/arch/guest_result.c
+	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.guest-result.tmp -fsyntax-only kernel/platform/qemu/guest_result.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.descriptors.tmp -fsyntax-only kernel/arch/x86_64/descriptors.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.descriptor-state.tmp \
 		-c kernel/arch/x86_64/descriptor_state.S -o /dev/null
@@ -248,7 +254,7 @@ $(LSP_DATABASE): $(KERNEL_SOURCES) $(KERNEL_ASM_SOURCES) tests/serial_test.c Mak
 		sed '$$s/,$$//' $@.serial-test.tmp; printf ']\n'; } >$@
 	@rm -f $@.*.tmp
 
-$(BUILD_DIR)/kernel.elf: $(KERNEL_OBJECTS) kernel/linker.ld Makefile
+$(BUILD_DIR)/kernel.elf: $(KERNEL_OBJECTS) $(KERNEL_LINKER_SCRIPT) Makefile
 	$(TARGET_CC) $(KERNEL_CFLAGS) $(KERNEL_LDFLAGS) $(KERNEL_OBJECTS) -o $@
 
 $(BUILD_DIR)/vandal-os.iso: $(BUILD_DIR)/kernel.elf boot/limine.conf $(LIMINE_TOOL) | check-image-tools

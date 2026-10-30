@@ -4,9 +4,9 @@
 
 #include <limine.h>
 
+#include "drivers/serial.h"
 #include "guest_result.h"
 #include "panic.h"
-#include "serial.h"
 
 #define LIMINE_BASE_REVISION_SUPPORTED(VAR) ((VAR)[2] == 0)
 #define DATA_PROBE_EXPECTED UINT64_C(0x56414e44414c4d30)

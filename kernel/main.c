@@ -5,9 +5,18 @@
 #include <limine.h>
 
 #include "arch/x86_64/descriptors.h"
+#include "arch/x86_64/exceptions.h"
 #include "drivers/serial.h"
 #include "guest_result.h"
 #include "panic.h"
+
+/*
+ * Fault stimuli are test-only objects, so a production build neither parses
+ * their declarations nor links them.
+ */
+#if defined(VANDAL_TEST_UD) || defined(VANDAL_TEST_UNEXPECTED_EXCEPTION)
+#include "../tests/exception_stimulus.h"
+#endif
 
 #define LIMINE_BASE_REVISION_SUPPORTED(VAR) ((VAR)[2] == 0)
 #define DATA_PROBE_EXPECTED UINT64_C(0x56414e44414c4d30)
@@ -15,6 +24,10 @@
 #if (defined(VANDAL_TEST_BAD_LIMINE_REVISION) + defined(VANDAL_TEST_BAD_DATA) +                    \
      defined(VANDAL_TEST_BAD_BSS)) > 1
 #error "select only one handoff-validation injection"
+#endif
+
+#if (defined(VANDAL_TEST_UD) + defined(VANDAL_TEST_UNEXPECTED_EXCEPTION)) > 1
+#error "select only one exception stimulus"
 #endif
 
 _Static_assert(sizeof(size_t) == 8, "x86-64 size_t must be 64 bits");
@@ -100,6 +113,20 @@ __attribute__((noreturn)) void kernel_main(void) {
 
 #if defined(VANDAL_TEST_DESCRIPTORS_REINITIALIZED)
     descriptors_init();
+#endif
+
+    exceptions_init();
+
+#if defined(VANDAL_TEST_EXCEPTIONS_REINITIALIZED)
+    exceptions_init();
+#endif
+
+#if defined(VANDAL_TEST_UD)
+    trigger_ud();
+#endif
+
+#if defined(VANDAL_TEST_UNEXPECTED_EXCEPTION)
+    trigger_breakpoint();
 #endif
 
     kernel_idle();

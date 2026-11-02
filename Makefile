@@ -65,11 +65,19 @@ KERNEL_CORE_ASM_SOURCES := \
 	kernel/arch/x86_64/descriptor_state.S \
 	kernel/arch/x86_64/exception_vector.S
 
-# The terminal exception decision is a link-time seam. The production policy is
-# linked here; an exception test can link its own implementation instead of
-# changing the dispatcher.
+# Exactly one terminal exception policy is linked. An exception-test image also
+# links the controlled fault stimuli it needs; both policy implementations and
+# both stimuli live outside kernel/ so a production image contains no test code.
+EXCEPTION_POLICY ?= production
+ifeq ($(EXCEPTION_POLICY),production)
 EXCEPTION_C_SOURCES := kernel/arch/x86_64/exception_finish_prod.c
 EXCEPTION_ASM_SOURCES :=
+else ifeq ($(EXCEPTION_POLICY),test)
+EXCEPTION_C_SOURCES := tests/exception_finish_test.c
+EXCEPTION_ASM_SOURCES := tests/exception_stimulus.S
+else
+$(error EXCEPTION_POLICY must be production or test)
+endif
 
 KERNEL_C_SOURCES := $(KERNEL_CORE_C_SOURCES) $(EXCEPTION_C_SOURCES)
 KERNEL_ASM_SOURCES := $(KERNEL_CORE_ASM_SOURCES) $(EXCEPTION_ASM_SOURCES)
@@ -83,8 +91,13 @@ KERNEL_HEADERS := \
 	kernel/arch/x86_64/exception_policy.h \
 	kernel/arch/x86_64/io.h
 KERNEL_OBJECTS := $(addprefix $(BUILD_DIR)/,$(KERNEL_C_SOURCES:.c=.o) $(KERNEL_ASM_SOURCES:.S=.o))
+# The test policy and its stimuli stay outside kernel/. Assembly is excluded
+# from formatting because clang-format does not parse it.
+EXCEPTION_TEST_C_FILES := tests/exception_finish_test.c tests/exception_stimulus.h
+EXCEPTION_TEST_ASM_FILES := tests/exception_stimulus.S
+EXCEPTION_TEST_FILES := $(EXCEPTION_TEST_C_FILES) $(EXCEPTION_TEST_ASM_FILES)
 FORMAT_FILES := $(KERNEL_CORE_C_SOURCES) kernel/arch/x86_64/exception_finish_prod.c \
-	$(KERNEL_HEADERS) tests/serial_test.c
+	$(KERNEL_HEADERS) $(EXCEPTION_TEST_C_FILES) tests/serial_test.c
 SCRIPT_FILES := run.sh scripts/debug-kernel.sh scripts/run-qemu.sh scripts/test-guest-result.sh \
 	scripts/verify-artifact.sh
 SERIAL_TEST_BINARY := $(HOST_TEST_DIR)/serial-test
@@ -92,10 +105,11 @@ SERIAL_TEST_SOURCES := tests/serial_test.c kernel/drivers/serial.c
 
 .PHONY: all run debug gdb \
 	test test-host test-serial test-qemu test-guest-result test-panic test-limine-handoff \
-	test-descriptors \
+	test-descriptors test-exceptions \
 	test-qemu-direct test-qemu-serial-absent test-qemu-panic \
 	test-qemu-panic-serial-absent test-qemu-bad-revision test-qemu-bad-data \
-	test-qemu-bad-bss test-qemu-descriptors-reinitialized test-artifact \
+	test-qemu-bad-bss test-qemu-descriptors-reinitialized test-qemu-ud \
+	test-qemu-unexpected-exception test-qemu-exceptions-reinitialized test-artifact \
 	lsp format check-format check-scripts check check-tools check-compiler-tools \
 	check-download-tools check-image-tools check-qemu-tools check-gdb-tools check-format-tools \
 	check-artifact-tools clean
@@ -134,6 +148,9 @@ test-qemu:
 	$(MAKE) test-qemu-bad-data
 	$(MAKE) test-qemu-bad-bss
 	$(MAKE) test-qemu-descriptors-reinitialized
+	$(MAKE) test-qemu-exceptions-reinitialized
+	$(MAKE) test-qemu-ud
+	$(MAKE) test-qemu-unexpected-exception
 
 # Compatibility groups retained for the documented workflows.
 test-guest-result:
@@ -151,6 +168,11 @@ test-limine-handoff:
 
 test-descriptors:
 	$(MAKE) test-qemu-descriptors-reinitialized
+
+test-exceptions:
+	$(MAKE) test-qemu-exceptions-reinitialized
+	$(MAKE) test-qemu-ud
+	$(MAKE) test-qemu-unexpected-exception
 
 test-qemu-direct: | check-qemu-tools
 	$(MAKE) BUILD_DIR=$(QEMU_TEST_DIR)/direct EXTRA_CPPFLAGS=-DVANDAL_TEST_GUEST_RESULT all
@@ -209,6 +231,30 @@ test-qemu-descriptors-reinitialized: | check-qemu-tools
 		./scripts/test-guest-result.sh descriptors-reinitialized \
 		$(QEMU_TEST_DIR)/descriptors-reinitialized/vandal-os.iso 47 stdio \
 		$(TEST_RESULTS_DIR)/descriptors-reinitialized.log
+
+test-qemu-exceptions-reinitialized: | check-qemu-tools
+	$(MAKE) BUILD_DIR=$(QEMU_TEST_DIR)/exceptions-reinitialized \
+		EXTRA_CPPFLAGS=-DVANDAL_TEST_EXCEPTIONS_REINITIALIZED all
+	VANDAL_QEMU_MACHINE=$(QEMU_MACHINE) VANDAL_QEMU_ACCEL=$(QEMU_ACCEL) \
+		./scripts/test-guest-result.sh exceptions-reinitialized \
+		$(QEMU_TEST_DIR)/exceptions-reinitialized/vandal-os.iso 53 stdio \
+		$(TEST_RESULTS_DIR)/exceptions-reinitialized.log
+
+test-qemu-ud: | check-qemu-tools
+	$(MAKE) BUILD_DIR=$(QEMU_TEST_DIR)/ud EXTRA_CPPFLAGS=-DVANDAL_TEST_UD \
+		EXCEPTION_POLICY=test all
+	VANDAL_QEMU_MACHINE=$(QEMU_MACHINE) VANDAL_QEMU_ACCEL=$(QEMU_ACCEL) \
+		./scripts/test-guest-result.sh ud \
+		$(QEMU_TEST_DIR)/ud/vandal-os.iso 59 stdio \
+		$(TEST_RESULTS_DIR)/ud.log
+
+test-qemu-unexpected-exception: | check-qemu-tools
+	$(MAKE) BUILD_DIR=$(QEMU_TEST_DIR)/unexpected-exception \
+		EXTRA_CPPFLAGS=-DVANDAL_TEST_UNEXPECTED_EXCEPTION EXCEPTION_POLICY=test all
+	VANDAL_QEMU_MACHINE=$(QEMU_MACHINE) VANDAL_QEMU_ACCEL=$(QEMU_ACCEL) \
+		./scripts/test-guest-result.sh unexpected-exception \
+		$(QEMU_TEST_DIR)/unexpected-exception/vandal-os.iso 61 stdio \
+		$(TEST_RESULTS_DIR)/unexpected-exception.log
 
 test-artifact: all | check-artifact-tools
 	./scripts/verify-artifact.sh $(BUILD_DIR)/kernel.elf $(BUILD_DIR)/vandal-os.iso
@@ -275,8 +321,8 @@ $(SERIAL_TEST_BINARY): $(SERIAL_TEST_SOURCES) kernel/drivers/serial.h Makefile |
 	@mkdir -p $(@D)
 	$(HOST_CC) $(HOST_TEST_CPPFLAGS) $(HOST_TEST_CFLAGS) $(SERIAL_TEST_SOURCES) -o $@
 
-$(LSP_DATABASE): $(KERNEL_C_SOURCES) $(KERNEL_ASM_SOURCES) tests/serial_test.c Makefile \
-	$(LIMINE_HEADER) | check-compiler-tools
+$(LSP_DATABASE): $(KERNEL_C_SOURCES) $(KERNEL_ASM_SOURCES) $(EXCEPTION_TEST_FILES) \
+	tests/serial_test.c Makefile $(LIMINE_HEADER) | check-compiler-tools
 	@mkdir -p $(@D)
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.main.tmp -fsyntax-only kernel/main.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.serial.tmp -fsyntax-only kernel/drivers/serial.c
@@ -287,17 +333,22 @@ $(LSP_DATABASE): $(KERNEL_C_SOURCES) $(KERNEL_ASM_SOURCES) tests/serial_test.c M
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.exception-dispatch.tmp -fsyntax-only kernel/arch/x86_64/exception_dispatch.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.exception-finish.tmp \
 		-fsyntax-only kernel/arch/x86_64/exception_finish_prod.c
+	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.exception-finish-test.tmp \
+		-fsyntax-only tests/exception_finish_test.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.descriptor-state.tmp \
 		-c kernel/arch/x86_64/descriptor_state.S -o /dev/null
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.exception-vector.tmp \
 		-c kernel/arch/x86_64/exception_vector.S -o /dev/null
+	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.exception-stimulus.tmp \
+		-c tests/exception_stimulus.S -o /dev/null
 	$(HOST_CC) $(HOST_TEST_CPPFLAGS) $(HOST_TEST_CFLAGS) -MJ $@.serial-test.tmp -fsyntax-only tests/serial_test.c
 	@{ printf '[\n'; sed -n 'p' $@.main.tmp; sed -n 'p' $@.serial.tmp; \
 		sed -n 'p' $@.panic.tmp; sed -n 'p' $@.guest-result.tmp; \
 		sed -n 'p' $@.descriptors.tmp; sed -n 'p' $@.exceptions.tmp; \
 		sed -n 'p' $@.exception-dispatch.tmp; \
-		sed -n 'p' $@.exception-finish.tmp; \
+		sed -n 'p' $@.exception-finish.tmp; sed -n 'p' $@.exception-finish-test.tmp; \
 		sed -n 'p' $@.descriptor-state.tmp; sed -n 'p' $@.exception-vector.tmp; \
+		sed -n 'p' $@.exception-stimulus.tmp; \
 		sed '$$s/,$$//' $@.serial-test.tmp; printf ']\n'; } >$@
 	@rm -f $@.*.tmp
 

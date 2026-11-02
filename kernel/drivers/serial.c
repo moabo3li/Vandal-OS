@@ -125,16 +125,38 @@ bool serial_init(void) {
     return true;
 }
 
+bool serial_putc(uint8_t byte) {
+    if (!serial_initialized) {
+        return false;
+    }
+    return serial_write_byte(byte);
+}
+
 bool serial_puts(const char *text) {
     if (!serial_initialized || text == NULL) {
         return false;
     }
     /* Write each character until the terminating NUL or a transmission failure. */
     while (*text != '\0') {
-        if (!serial_write_byte(*text)) {
+        if (!serial_putc(*text)) {
             return false;
         }
         text++;
+    }
+    return true;
+}
+
+bool serial_puthex(uint64_t value) {
+    static const char digits[] = "0123456789ABCDEF";
+
+    if (!serial_puts("0x")) {
+        return false;
+    }
+
+    for (int shift = 60; shift >= 0; shift -= 4) {
+        if (!serial_putc((uint8_t)digits[(value >> shift) & 15])) {
+            return false;
+        }
     }
     return true;
 }

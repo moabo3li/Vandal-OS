@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #define COM1_BASE_PORT UINT16_C(0x03f8)
 #define SERIAL_REG_THR UINT16_C(0)
@@ -30,7 +31,7 @@ static uint8_t mock_lcr;
 static uint8_t mock_lsr;
 static uint32_t lsr_reads;
 static uint32_t thr_writes;
-static uint8_t transmitted[2];
+static uint8_t transmitted[32];
 static struct port_write port_writes[8];
 static size_t port_write_count;
 
@@ -93,6 +94,7 @@ static int check_initialization_writes(void) {
 
 int main(void) {
     CHECK(!serial_puts("before init"));
+    CHECK(!serial_putc('X'));
 
     mock_lsr = SERIAL_LSR_NO_DEVICE;
     port_write_count = 0;
@@ -120,6 +122,19 @@ int main(void) {
     CHECK(thr_writes == 2);
     CHECK(transmitted[0] == 'O');
     CHECK(transmitted[1] == 'K');
+
+    thr_writes = 0;
+    CHECK(serial_putc('Z'));
+    CHECK(thr_writes == 1);
+    CHECK(transmitted[0] == 'Z');
+
+    static const char expected_hex[] = "0x0000000000001234";
+
+    thr_writes = 0;
+    memset(transmitted, 0, sizeof(transmitted));
+    CHECK(serial_puthex(UINT64_C(0x1234)));
+    CHECK(thr_writes == sizeof(expected_hex) - 1U);
+    CHECK(memcmp(transmitted, expected_hex, sizeof(expected_hex) - 1U) == 0);
 
     puts("serial tests: PASS");
     return 0;

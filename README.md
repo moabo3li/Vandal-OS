@@ -67,8 +67,8 @@ database in `build/compile_commands.json`.
 - `kernel/main.c` contains the kernel entry point and halt loop.
 - `kernel/panic.c` and `kernel/guest_result.h` own architecture-neutral failure
   policy and its reporting interface.
-- `kernel/arch/x86_64/` owns x86-64 descriptor state, port-I/O primitives, and
-  the architecture-specific ELF layout.
+- `kernel/arch/x86_64/` owns x86-64 descriptor and exception/IDT state, port-I/O
+  primitives, and the architecture-specific ELF layout.
 - `kernel/drivers/` owns hardware-device drivers such as the polling COM1
   implementation.
 - `kernel/platform/qemu/` owns the QEMU-only guest-result transport.

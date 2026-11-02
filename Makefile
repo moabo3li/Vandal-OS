@@ -89,6 +89,7 @@ KERNEL_HEADERS := \
 	kernel/arch/x86_64/exceptions.h \
 	kernel/arch/x86_64/exception_frame.h \
 	kernel/arch/x86_64/exception_policy.h \
+	kernel/arch/x86_64/control_regs.h \
 	kernel/arch/x86_64/io.h
 KERNEL_OBJECTS := $(addprefix $(BUILD_DIR)/,$(KERNEL_C_SOURCES:.c=.o) $(KERNEL_ASM_SOURCES:.S=.o))
 # The test policy and its stimuli stay outside kernel/. Assembly is excluded

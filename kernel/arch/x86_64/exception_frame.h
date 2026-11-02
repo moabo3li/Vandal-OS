@@ -4,6 +4,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* Vector whose delivery defines CR2; other vectors leave it stale. */
+enum { PAGE_FAULT_VECTOR = 14 };
+
 /*
  * C-visible record built by the assembly entry boundary.
  *
@@ -14,6 +17,12 @@
  *
  * The assembly push order is the source of truth; the assertions below check
  * that this C view still matches it.
+ *
+ * This record is a diagnostic snapshot, not a resumable frame: it stops at
+ * RFLAGS and owns no return path. TODO(M2): a returning path must restore the
+ * saved GPRs and consume these hardware words with IRETQ. TODO(M3): a
+ * privilege-changing delivery adds SS and RSP above RFLAGS, which this record
+ * deliberately excludes.
  */
 struct exception_frame {
     uint64_t r15;

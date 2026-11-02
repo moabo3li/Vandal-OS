@@ -26,7 +26,7 @@
 #error "select only one handoff-validation injection"
 #endif
 
-#if (defined(VANDAL_TEST_UD) + defined(VANDAL_TEST_UNEXPECTED_EXCEPTION) +                        \
+#if (defined(VANDAL_TEST_UD) + defined(VANDAL_TEST_UNEXPECTED_EXCEPTION) +                         \
      defined(VANDAL_TEST_PF)) > 1
 #error "select only one exception stimulus"
 #endif

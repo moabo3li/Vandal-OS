@@ -50,13 +50,13 @@ _Static_assert(GDT_TSS_SELECTOR == 0x18, "TSS selector");
  * LGDT reads this architectural 10-byte memory operand: a 16-bit last-byte
  * offset followed immediately by the 64-bit linear base of the table.
  */
-struct __attribute__((packed)) table_pointer {
+struct __attribute__((packed)) gdt_pointer {
     uint16_t limit;
     uintptr_t base;
 };
 
-_Static_assert(sizeof(struct table_pointer) == 10, "GDTR operand must be 10 bytes");
-_Static_assert(offsetof(struct table_pointer, base) == 2, "GDTR base offset must be 2");
+_Static_assert(sizeof(struct gdt_pointer) == 10, "GDTR operand must be 10 bytes");
+_Static_assert(offsetof(struct gdt_pointer, base) == 2, "GDTR base offset must be 2");
 
 /*
  * A 64-bit TSS system descriptor occupies two consecutive GDT slots. The
@@ -130,10 +130,10 @@ _Static_assert(offsetof(struct tss, io_map_base) == 102, "I/O-map offset field")
  * the call; descriptors_init validates its bytes first, while CPL 0, IF clear,
  * and a valid current stack remain caller preconditions.
  */
-extern void load_descriptor_state(const struct table_pointer *operand);
+extern void load_descriptor_state(const struct gdt_pointer *operand);
 
 /* Copy the current ten-byte GDTR value into result without changing GDTR. */
-extern void read_gdtr(struct table_pointer *result);
+extern void read_gdtr(struct gdt_pointer *result);
 
 /* Return the visible task-register selector without changing TR. */
 extern uint16_t read_tr(void);
@@ -194,7 +194,7 @@ _Static_assert(sizeof(kernel_gdt) <= (size_t)UINT16_MAX + 1U,
  * LGDT copies this operand into GDTR; it does not retain the operand's address.
  * The limit is therefore the last valid byte offset in the owned table.
  */
-__attribute__((used)) static const struct table_pointer kernel_gdt_operand = {
+__attribute__((used)) static const struct gdt_pointer kernel_gdt_operand = {
     .limit = (uint16_t)(sizeof(kernel_gdt) - 1U),
     .base = (uintptr_t)&kernel_gdt,
 };
@@ -291,7 +291,7 @@ static bool prepared_state_is_valid(void) {
  * evidence and are not exposed by these readbacks.
  */
 static bool live_descriptor_state_is_valid(void) {
-    struct table_pointer observed_gdtr = {0};
+    struct gdt_pointer observed_gdtr = {0};
     uint16_t observed_tr;
 
     read_gdtr(&observed_gdtr);

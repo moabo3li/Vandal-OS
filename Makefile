@@ -52,25 +52,39 @@ KERNEL_LDFLAGS := \
 HOST_TEST_CPPFLAGS := -DVANDAL_SERIAL_TEST -Ikernel
 HOST_TEST_CFLAGS := -std=c11 -O2 -g3 -Wall -Wextra -Wpedantic -Werror
 
-KERNEL_C_SOURCES := \
+# Sources that every image shares. The exception mechanism is production code.
+KERNEL_CORE_C_SOURCES := \
 	kernel/main.c \
 	kernel/drivers/serial.c \
 	kernel/platform/qemu/guest_result.c \
 	kernel/arch/x86_64/descriptors.c \
+	kernel/arch/x86_64/exceptions.c \
+	kernel/arch/x86_64/exception_dispatch.c \
 	kernel/panic.c
-KERNEL_ASM_SOURCES := \
-	kernel/arch/x86_64/descriptor_state.S
+KERNEL_CORE_ASM_SOURCES := \
+	kernel/arch/x86_64/descriptor_state.S \
+	kernel/arch/x86_64/exception_vector.S
+
+# The terminal exception decision is a link-time seam. The production policy is
+# linked here; an exception test can link its own implementation instead of
+# changing the dispatcher.
+EXCEPTION_C_SOURCES := kernel/arch/x86_64/exception_finish_prod.c
+EXCEPTION_ASM_SOURCES :=
+
+KERNEL_C_SOURCES := $(KERNEL_CORE_C_SOURCES) $(EXCEPTION_C_SOURCES)
+KERNEL_ASM_SOURCES := $(KERNEL_CORE_ASM_SOURCES) $(EXCEPTION_ASM_SOURCES)
 KERNEL_HEADERS := \
 	kernel/guest_result.h \
 	kernel/panic.h \
 	kernel/drivers/serial.h \
 	kernel/arch/x86_64/descriptors.h \
+	kernel/arch/x86_64/exceptions.h \
+	kernel/arch/x86_64/exception_frame.h \
+	kernel/arch/x86_64/exception_policy.h \
 	kernel/arch/x86_64/io.h
-KERNEL_ASM_OBJECTS := $(KERNEL_ASM_SOURCES:kernel/%.S=$(BUILD_DIR)/kernel/%.o)
-KERNEL_OBJECTS := \
-	$(KERNEL_C_SOURCES:kernel/%.c=$(BUILD_DIR)/kernel/%.o) \
-	$(KERNEL_ASM_OBJECTS)
-FORMAT_FILES := $(KERNEL_C_SOURCES) $(KERNEL_HEADERS) tests/serial_test.c
+KERNEL_OBJECTS := $(addprefix $(BUILD_DIR)/,$(KERNEL_C_SOURCES:.c=.o) $(KERNEL_ASM_SOURCES:.S=.o))
+FORMAT_FILES := $(KERNEL_CORE_C_SOURCES) kernel/arch/x86_64/exception_finish_prod.c \
+	$(KERNEL_HEADERS) tests/serial_test.c
 SCRIPT_FILES := run.sh scripts/debug-kernel.sh scripts/run-qemu.sh scripts/test-guest-result.sh \
 	scripts/verify-artifact.sh
 SERIAL_TEST_BINARY := $(HOST_TEST_DIR)/serial-test
@@ -249,11 +263,11 @@ check-artifact-tools:
 	@command -v llvm-objdump >/dev/null || { echo "error: llvm-objdump is required" >&2; exit 1; }
 	@command -v $(XORRISO) >/dev/null || { echo "error: $(XORRISO) is required" >&2; exit 1; }
 
-$(BUILD_DIR)/kernel/%.o: kernel/%.c Makefile $(LIMINE_HEADER) | check-compiler-tools
+$(BUILD_DIR)/%.o: %.c Makefile $(LIMINE_HEADER) | check-compiler-tools
 	@mkdir -p $(@D)
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MMD -MP -c $< -o $@
 
-$(BUILD_DIR)/kernel/%.o: kernel/%.S Makefile | check-compiler-tools
+$(BUILD_DIR)/%.o: %.S Makefile | check-compiler-tools
 	@mkdir -p $(@D)
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MMD -MP -c $< -o $@
 
@@ -269,12 +283,21 @@ $(LSP_DATABASE): $(KERNEL_C_SOURCES) $(KERNEL_ASM_SOURCES) tests/serial_test.c M
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.panic.tmp -fsyntax-only kernel/panic.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.guest-result.tmp -fsyntax-only kernel/platform/qemu/guest_result.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.descriptors.tmp -fsyntax-only kernel/arch/x86_64/descriptors.c
+	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.exceptions.tmp -fsyntax-only kernel/arch/x86_64/exceptions.c
+	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.exception-dispatch.tmp -fsyntax-only kernel/arch/x86_64/exception_dispatch.c
+	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.exception-finish.tmp \
+		-fsyntax-only kernel/arch/x86_64/exception_finish_prod.c
 	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.descriptor-state.tmp \
 		-c kernel/arch/x86_64/descriptor_state.S -o /dev/null
+	$(TARGET_CC) $(KERNEL_CPPFLAGS) $(KERNEL_CFLAGS) -MJ $@.exception-vector.tmp \
+		-c kernel/arch/x86_64/exception_vector.S -o /dev/null
 	$(HOST_CC) $(HOST_TEST_CPPFLAGS) $(HOST_TEST_CFLAGS) -MJ $@.serial-test.tmp -fsyntax-only tests/serial_test.c
 	@{ printf '[\n'; sed -n 'p' $@.main.tmp; sed -n 'p' $@.serial.tmp; \
 		sed -n 'p' $@.panic.tmp; sed -n 'p' $@.guest-result.tmp; \
-		sed -n 'p' $@.descriptors.tmp; sed -n 'p' $@.descriptor-state.tmp; \
+		sed -n 'p' $@.descriptors.tmp; sed -n 'p' $@.exceptions.tmp; \
+		sed -n 'p' $@.exception-dispatch.tmp; \
+		sed -n 'p' $@.exception-finish.tmp; \
+		sed -n 'p' $@.descriptor-state.tmp; sed -n 'p' $@.exception-vector.tmp; \
 		sed '$$s/,$$//' $@.serial-test.tmp; printf ']\n'; } >$@
 	@rm -f $@.*.tmp
 

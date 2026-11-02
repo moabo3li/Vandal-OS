@@ -23,10 +23,21 @@ static bool is_controlled_ud(const struct exception_frame *frame) {
            frame->rip == (uintptr_t)&ud_site;
 }
 
+/* #PF on the controlled read: vector 14, not-present supervisor read, pf_site. */
+static bool is_controlled_page_fault(const struct exception_frame *frame) {
+    return frame->vector == 14 && frame->error_code == 0 && frame->cs == EXPECTED_KERNEL_CS &&
+           frame->rip == (uintptr_t)&pf_site;
+}
+
 __attribute__((noreturn)) void exception_finish(const struct exception_frame *frame) {
     if (is_controlled_ud(frame)) {
         (void)serial_puts("UD_PASS\n");
         guest_result_report(GUEST_RESULT_UD_PASS);
+    }
+
+    if (is_controlled_page_fault(frame)) {
+        (void)serial_puts("PF_PASS\n");
+        guest_result_report(GUEST_RESULT_PF_PASS);
     }
 
     /* Any other delivery, including the deliberate #BP, fails the test. */

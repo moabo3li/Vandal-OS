@@ -110,6 +110,7 @@ SERIAL_TEST_SOURCES := tests/serial_test.c kernel/drivers/serial.c
 	test-qemu-panic-serial-absent test-qemu-bad-revision test-qemu-bad-data \
 	test-qemu-bad-bss test-qemu-descriptors-reinitialized test-qemu-ud \
 	test-qemu-unexpected-exception test-qemu-exceptions-reinitialized test-artifact \
+	test-qemu-page-fault \
 	lsp format check-format check-scripts check check-tools check-compiler-tools \
 	check-download-tools check-image-tools check-qemu-tools check-gdb-tools check-format-tools \
 	check-artifact-tools clean
@@ -151,6 +152,7 @@ test-qemu:
 	$(MAKE) test-qemu-exceptions-reinitialized
 	$(MAKE) test-qemu-ud
 	$(MAKE) test-qemu-unexpected-exception
+	$(MAKE) test-qemu-page-fault
 
 # Compatibility groups retained for the documented workflows.
 test-guest-result:
@@ -173,6 +175,7 @@ test-exceptions:
 	$(MAKE) test-qemu-exceptions-reinitialized
 	$(MAKE) test-qemu-ud
 	$(MAKE) test-qemu-unexpected-exception
+	$(MAKE) test-qemu-page-fault
 
 test-qemu-direct: | check-qemu-tools
 	$(MAKE) BUILD_DIR=$(QEMU_TEST_DIR)/direct EXTRA_CPPFLAGS=-DVANDAL_TEST_GUEST_RESULT all
@@ -255,6 +258,14 @@ test-qemu-unexpected-exception: | check-qemu-tools
 		./scripts/test-guest-result.sh unexpected-exception \
 		$(QEMU_TEST_DIR)/unexpected-exception/vandal-os.iso 61 stdio \
 		$(TEST_RESULTS_DIR)/unexpected-exception.log
+
+test-qemu-page-fault: | check-qemu-tools
+	$(MAKE) BUILD_DIR=$(QEMU_TEST_DIR)/page-fault EXTRA_CPPFLAGS=-DVANDAL_TEST_PF \
+		EXCEPTION_POLICY=test all
+	VANDAL_QEMU_MACHINE=$(QEMU_MACHINE) VANDAL_QEMU_ACCEL=$(QEMU_ACCEL) \
+		./scripts/test-guest-result.sh page-fault \
+		$(QEMU_TEST_DIR)/page-fault/vandal-os.iso 63 stdio \
+		$(TEST_RESULTS_DIR)/page-fault.log
 
 test-artifact: all | check-artifact-tools
 	./scripts/verify-artifact.sh $(BUILD_DIR)/kernel.elf $(BUILD_DIR)/vandal-os.iso

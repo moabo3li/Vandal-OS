@@ -16,4 +16,8 @@ extern const char ud_site;
 /* Execute INT3 so vector 3 proves the policy rejects an unexpected delivery. */
 extern void trigger_breakpoint(void);
 
+/* Read the controlled unmapped address so vector 14 saves pf_site as the RIP. */
+extern void trigger_page_fault(void);
+extern const char pf_site;
+
 #endif

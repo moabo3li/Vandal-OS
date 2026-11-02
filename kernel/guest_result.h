@@ -17,6 +17,7 @@ typedef enum guest_result {
     GUEST_RESULT_EXCEPTIONS_READBACK = 0x1c,
     GUEST_RESULT_UD_PASS = 0x1d,
     GUEST_RESULT_EXCEPTION_UNEXPECTED = 0x1e,
+    GUEST_RESULT_PF_PASS = 0x1f,
 } guest_result;
 
 /* QEMU converts this value to an 8-bit process status with (value << 1) | 1. */

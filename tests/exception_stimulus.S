@@ -51,3 +51,29 @@ trigger_breakpoint:
     jmp 3b
 
 .size trigger_breakpoint, .-trigger_breakpoint
+
+/*
+ * Deliberate #PF (vector 14).
+ *
+ * Read from a canonical but intentionally unmapped virtual address.
+ * Expected: CR2 = 0x0000400000000000, error code = 0x0
+ * (supervisor read of a non-present page).
+ *
+ * The faulting RIP points to the movq instruction.
+ * The terminal exception dispatcher never returns.
+ */
+.globl trigger_page_fault
+.type trigger_page_fault, @function
+.globl pf_site
+
+trigger_page_fault:
+    movabsq $0x0000400000000000, %rax
+pf_site:
+    movq (%rax), %rax
+
+4:
+    cli
+    hlt
+    jmp 4b
+
+.size trigger_page_fault, .-trigger_page_fault

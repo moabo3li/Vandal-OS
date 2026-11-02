@@ -14,7 +14,7 @@
  * Fault stimuli are test-only objects, so a production build neither parses
  * their declarations nor links them.
  */
-#if defined(VANDAL_TEST_UD) || defined(VANDAL_TEST_UNEXPECTED_EXCEPTION)
+#if defined(VANDAL_TEST_UD) || defined(VANDAL_TEST_UNEXPECTED_EXCEPTION) || defined(VANDAL_TEST_PF)
 #include "../tests/exception_stimulus.h"
 #endif
 
@@ -26,7 +26,8 @@
 #error "select only one handoff-validation injection"
 #endif
 
-#if (defined(VANDAL_TEST_UD) + defined(VANDAL_TEST_UNEXPECTED_EXCEPTION)) > 1
+#if (defined(VANDAL_TEST_UD) + defined(VANDAL_TEST_UNEXPECTED_EXCEPTION) +                        \
+     defined(VANDAL_TEST_PF)) > 1
 #error "select only one exception stimulus"
 #endif
 
@@ -127,6 +128,10 @@ __attribute__((noreturn)) void kernel_main(void) {
 
 #if defined(VANDAL_TEST_UNEXPECTED_EXCEPTION)
     trigger_breakpoint();
+#endif
+
+#if defined(VANDAL_TEST_PF)
+    trigger_page_fault();
 #endif
 
     kernel_idle();

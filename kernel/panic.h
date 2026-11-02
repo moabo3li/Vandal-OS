@@ -9,6 +9,9 @@ typedef enum kernel_panic_reason {
     KERNEL_PANIC_DESCRIPTORS_REINITIALIZED,
     KERNEL_PANIC_DESCRIPTORS_PREFLIGHT,
     KERNEL_PANIC_DESCRIPTORS_READBACK,
+    KERNEL_PANIC_EXCEPTIONS_REINITIALIZED,
+    KERNEL_PANIC_EXCEPTIONS_PREFLIGHT,
+    KERNEL_PANIC_EXCEPTIONS_READBACK,
 } kernel_panic_reason;
 
 /* Publish one terminal kernel failure; this function never returns. */

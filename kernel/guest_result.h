@@ -12,10 +12,15 @@ typedef enum guest_result {
     GUEST_RESULT_DESCRIPTORS_REINITIALIZED = 0x17,
     GUEST_RESULT_DESCRIPTORS_PREFLIGHT = 0x18,
     GUEST_RESULT_DESCRIPTORS_READBACK = 0x19,
+    GUEST_RESULT_EXCEPTIONS_REINITIALIZED = 0x1a,
+    GUEST_RESULT_EXCEPTIONS_PREFLIGHT = 0x1b,
+    GUEST_RESULT_EXCEPTIONS_READBACK = 0x1c,
+    GUEST_RESULT_UD_PASS = 0x1d,
+    GUEST_RESULT_EXCEPTION_UNEXPECTED = 0x1e,
 } guest_result;
 
 /* QEMU converts this value to an 8-bit process status with (value << 1) | 1. */
-_Static_assert(GUEST_RESULT_DESCRIPTORS_READBACK <= 0x7f,
+_Static_assert(GUEST_RESULT_EXCEPTION_UNEXPECTED <= 0x7f,
                "guest results must remain distinguishable as process statuses");
 
 /* Report one test result to QEMU, then halt if the device is unavailable. */

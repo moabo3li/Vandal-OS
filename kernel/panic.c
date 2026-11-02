@@ -44,6 +44,21 @@ static panic_desc panic_describe(kernel_panic_reason reason) {
             "Vandal-OS panic: descriptor state readback mismatch\r\n",
             GUEST_RESULT_DESCRIPTORS_READBACK,
         };
+    case KERNEL_PANIC_EXCEPTIONS_REINITIALIZED:
+        return (panic_desc){
+            "Vandal-OS panic: exception state initialized more than once\r\n",
+            GUEST_RESULT_EXCEPTIONS_REINITIALIZED,
+        };
+    case KERNEL_PANIC_EXCEPTIONS_PREFLIGHT:
+        return (panic_desc){
+            "Vandal-OS panic: exception table failed preflight\r\n",
+            GUEST_RESULT_EXCEPTIONS_PREFLIGHT,
+        };
+    case KERNEL_PANIC_EXCEPTIONS_READBACK:
+        return (panic_desc){
+            "Vandal-OS panic: IDTR readback mismatch\r\n",
+            GUEST_RESULT_EXCEPTIONS_READBACK,
+        };
     }
 
     return (panic_desc){
